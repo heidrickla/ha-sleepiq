@@ -31,7 +31,7 @@ Per side, for beds whose foundation reports the massage board:
 | `{bed} {sleeper} Massage Mode` | `select` | off, soothe, revitalize, wave |
 | `{bed} {sleeper} Foot Massage Speed` | `select` | off, low, medium, high |
 | `{bed} {sleeper} Head Massage Speed` | `select` | off, low, medium, high |
-| `{bed} {sleeper} Massage Timer` | `number` | 0-30 minutes |
+| `{bed} {sleeper} Massage Timer` | `number` | 0-60 minutes |
 
 Entities are named by **sleeper**, not by physical side - "Lewis Massage Mode",
 not "Right Massage Mode" - matching how core names the other per-sleeper comfort
@@ -68,6 +68,24 @@ created, four per side, and the integration loaded with no errors.
 | Sleeper-to-side mapping | **pass** - left and right resolve to the correct sleepers |
 | Wave mode engages | **fails** - see below |
 | Timer holds its value | **expires when idle** - see below |
+
+## Starting a massage arms a 60 minute timer
+
+Selecting any speed or mode with no timer set arms **60 minutes** - the maximum
+the vendor app and the physical remotes offer.
+
+This is deliberate, and it exists because of the expiry behaviour below: the bed
+drops an idle timer, so a massage started without one has nothing scheduled to
+stop it. Defaulting means the motors always have an end.
+
+An explicitly set timer is never overridden - the logic is
+`self.timer or MASSAGE_DEFAULT_TIMER`, matching how core defaults comparable
+hardware (`timer = self.foot_warmer.timer or 120`). Set 20 minutes and you get
+20; set nothing and you get 60.
+
+The 60 minute ceiling also corroborates the countdown reading: a capture of a
+running massage reported `massageTimer: 57`, which is what 57 minutes remaining
+of a 60 minute run looks like.
 
 ## Known issue: the timer expires if massage is not started
 
