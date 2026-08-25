@@ -32,9 +32,9 @@ from .const import (
     ICON_OCCUPIED,
     MASSAGE_TIMER,
 )
-from .massage import MASSAGE_TIMER_MAX, MASSAGE_TIMER_MIN, SleepIQMassage
 from .coordinator import SleepIQConfigEntry, SleepIQDataUpdateCoordinator
 from .entity import SleepIQBedEntity, sleeper_for_side
+from .massage import MASSAGE_TIMER_MAX, MASSAGE_TIMER_MIN, SleepIQMassage
 
 
 @dataclass(frozen=True, kw_only=True)

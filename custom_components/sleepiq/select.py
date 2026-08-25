@@ -25,9 +25,9 @@ from .const import (
     MASSAGE_HEAD_SPEED,
     MASSAGE_MODE,
 )
-from .massage import SleepIQMassage
 from .coordinator import SleepIQConfigEntry, SleepIQDataUpdateCoordinator
 from .entity import SleepIQBedEntity, SleepIQSleeperEntity, sleeper_for_side
+from .massage import SleepIQMassage
 
 
 async def async_setup_entry(

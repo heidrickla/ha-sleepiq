@@ -1,11 +1,15 @@
 name: Validate
 
-# Gitea Actions. Runs on the self-hosted act_runner on a self-hosted runner rather than
-# GitHub-hosted runners, which is the point - GitHub Actions minutes are a
-# budget line and this hardware is already paid for.
+# Runs on the self-hosted act_runner on a self-hosted runner, not GitHub-hosted runners -
+# GitHub Actions minutes are a budget line and this hardware is already paid for.
 #
-# The GitHub workflow is kept at .github/workflows/validate.yml so the repo
-# still validates if it is ever mirrored back, but nothing pushes there now.
+# THE RUNNER IS SHARED AND ITS CAPACITY IS 1. Other agent sessions queue behind
+# anything pushed here, so the per-push job is deliberately ONE fast job. The
+# slow Home Assistant actions are workflow_dispatch only - available on demand,
+# never occupying the shared runner on every commit.
+# (Capacity >1 was tried on 2026-08-25 and act_runner v0.6.1 corrupted job
+# contexts - un-interpolated matrix vars and cross-job workspace lstat - so 1 is
+# the known-good setting. Do not raise it to make this faster.)
 
 on:
   push:
@@ -13,23 +17,57 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Native checks first: no third-party actions, so this job is the one that
-  # always tells the truth about the code even if the Docker-based HA actions
-  # cannot fetch or run on this runner.
   lint:
     name: Lint and structure
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Install ruff (PINNED)
+        # Pinned deliberately. An unpinned linter makes CI non-reproducible:
+        # this job passed locally and failed in CI purely because pip fetched a
+        # newer ruff whose default rules differed from the local install.
         run: |
-          python3 --version
           python3 -m pip install --quiet --upgrade pip
-          python3 -m pip install --quiet ruff
+          python3 -m pip install --quiet "ruff==0.15.21"
+          python3 -m ruff --version
 
       - name: Ruff
+        # ruff.toml adopts Home Assistant core's isort settings, because this
+        # repo vendors core's files and must not reformat them.
         run: python3 -m ruff check custom_components/
+
+      - name: Vendored core files are unmodified
+        # The point of the baseline: an upstream resync stays a small diff only
+        # while the untouched files stay byte-identical. Reformatting one - by
+        # ruff --fix, an editor, or a well-meaning cleanup - silently destroys
+        # that, and nothing else would notice.
+        run: |
+          python3 - <<'PY'
+          import hashlib, io, os, re, sys
+          base = {}
+          for line in io.open("docs/UPSTREAM-BASELINE.txt", encoding="utf-8"):
+              m = re.match(r"\s*([0-9a-f]{64})\s+\*?(\S+)", line)
+              if m: base[m.group(2)] = m.group(1)
+          # Files this project deliberately modifies. Everything else in the
+          # baseline must still match upstream exactly.
+          OWNED = {"__init__.py","const.py","coordinator.py","number.py",
+                   "select.py","icons.json","manifest.json","strings.json"}
+          bad = []
+          for name, want in sorted(base.items()):
+              if name in OWNED: continue
+              p = os.path.join("custom_components/sleepiq", name)
+              if not os.path.exists(p):
+                  bad.append(f"{name}: MISSING"); continue
+              got = hashlib.sha256(open(p, "rb").read()).hexdigest()
+              if got != want:
+                  bad.append(f"{name}: drifted from upstream 2026.8.2")
+          if bad:
+              print("Vendored core files must stay byte-identical:")
+              for b in bad: print("  -", b)
+              sys.exit(1)
+          print(f"{len(base)-len(OWNED)} vendored file(s) match upstream")
+          PY
 
       - name: Every module parses
         run: |
@@ -42,8 +80,8 @@ jobs:
         run: |
           for f in custom_components/sleepiq/*.json hacs.json; do
             python3 -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "$f" || exit 1
-            echo "  ok $f"
           done
+          echo "all JSON valid"
 
       - name: Manifest sanity
         run: |
@@ -53,15 +91,15 @@ jobs:
           missing = [k for k in ("domain","name","version","documentation","codeowners") if not m.get(k)]
           assert not missing, f"manifest missing: {missing}"
           assert m["domain"] == "sleepiq", m["domain"]
-          # A custom component MUST carry a version or Home Assistant refuses to load it.
+          # A custom integration without a version silently fails to load - the
+          # symptom is a missing integration, not an error.
           assert m["version"], "version is required for a custom integration"
           print("manifest ok:", m["domain"], m["version"])
           PY
 
       - name: No core-only translation refs
-        # strings.json in HA core uses [%key:common::...] references that only
-        # resolve inside core's build. In a custom component they render as raw
-        # keys, so they must not come back during an upstream resync.
+        # strings.json in core uses [%key:common::...] refs that resolve only
+        # inside core's build; in a custom component they render as raw keys.
         run: |
           if grep -q '%key:' custom_components/sleepiq/strings.json; then
             echo "core-only [%key:...] reference found - replace with a literal"
@@ -69,20 +107,17 @@ jobs:
           fi
           echo "no core-only refs"
 
-  hassfest:
-    name: hassfest
+  # Slow, and depend on fetching third-party actions. Manual only, so they never
+  # hold the shared single-capacity runner on an ordinary push.
+  home-assistant:
+    name: hassfest + HACS
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    continue-on-error: true   # third-party action; do not fail the run if it cannot fetch
     steps:
       - uses: actions/checkout@v4
       - uses: home-assistant/actions/hassfest@master
-
-  hacs:
-    name: HACS
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
+        continue-on-error: true
       - uses: hacs/action@main
+        continue-on-error: true
         with:
           category: integration

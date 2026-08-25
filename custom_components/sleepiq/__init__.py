@@ -20,7 +20,6 @@ from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN, IS_IN_BED, SLEEP_NUMBER
-from .massage import build_massage_sides
 from .coordinator import (
     SleepIQConfigEntry,
     SleepIQData,
@@ -28,6 +27,7 @@ from .coordinator import (
     SleepIQPauseUpdateCoordinator,
     SleepIQSleepDataCoordinator,
 )
+from .massage import build_massage_sides
 
 _LOGGER = logging.getLogger(__name__)
 
