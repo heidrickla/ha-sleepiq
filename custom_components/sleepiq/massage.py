@@ -10,10 +10,17 @@ massage entities at all.
 
 So this fills in the read half and reuses the library's existing write half.
 
-The one behavioural rule that matters: **wave mode and motor speeds are mutually
-exclusive.** `set_foundation_massage()` forces both speeds to OFF whenever mode
-is not OFF, so setting a mode cancels the speeds and setting a speed must clear
-the mode. Entities have to mirror that or the UI will lie about the bed's state.
+The one behavioural rule that matters: **full-body patterns and the individual
+motor speeds are mutually exclusive.** `set_foundation_massage()` forces both
+speeds to OFF whenever a mode is set, and the vendor app agrees - its massage
+screen reads "Adjust either foot and head or full body massage", with Foot/Head
+and Full Body as two separate panels. Entities mirror that in both directions or
+the UI will lie about the bed's state.
+
+Naming note: the library's `Mode.SOOTHE` is what the app labels **Smooth**. The
+enum order matches the app's row exactly (Off, Smooth, Revitalize, Wave), so
+SOOTHE=1 is Smooth. The translation strings use the app's wording, because that
+is what is printed on the remote in the user's hand.
 """
 
 from __future__ import annotations

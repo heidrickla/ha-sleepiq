@@ -121,49 +121,60 @@ overwrite the local timer. **That was wrong.** A speed write does not disturb
 the timer at all, as the table above shows. The correct explanation is
 expiry, and it was found by testing the claim rather than reasoning about it.
 
-## Known issue: wave mode does not stick, and "Smooth" is missing
+## Known issue: the full-body patterns do not work
 
-The mode entity offers `off / soothe / revitilize / wave`, taken from the
-library's `Mode` enum. The vendor app exposes at least one pattern that is not
-in that list - **Smooth** - so the enum is probably incomplete.
+The Foot/Head speed controls work. The **Full Body** patterns - Smooth,
+Revitalize, Wave - do not. Selecting one is silently ignored by the bed.
 
-Selecting any mode also fails to take. The write reaches the bed (the motor
-speeds go to off, which is the mutual-exclusion behaviour) but `waveMode` reads
-back `0` on the next refresh. No error is logged.
+### Naming
 
-### What a packet capture of the vendor app shows
+The vendor app's Full Body row reads `Off / Smooth / Revitalize / Wave`. The
+library's enum is `OFF=0 / SOOTHE=1 / REVITILIZE=2 / WAVE=3` - the same order,
+so `SOOTHE` **is** Smooth. The translations use the app's wording, since that is
+what is printed in front of the user. Nothing is missing from the list; one
+entry was just labelled with the library's internal name.
 
-Captured requests to `foundation/adjustment` while driving massage from the app:
+### Why they fail
+
+Measured, same bed, minutes apart:
+
+| Write | Mode after | Timer after |
+| --- | --- | --- |
+| foot speed = low | - | **60** (auto-armed) |
+| mode = smooth | **0** | **0** |
+
+The mode write did not merely fail to set a mode - **the auto-armed timer did
+not take either**, though the identical timer logic works on the speed path.
+The bed is discarding the *entire request*, not just one field.
+
+That matches the packet capture of the vendor app, which never sends
+`massageWaveMode` in any request and only ever sends partial payloads:
 
     {"footMassageMotor": 3, "massageTimer": 15, "side": "R"}
     {"headMassageMotor": 3, "side": "R"}
     {"massageTimer": 60, "side": "R"}
 
-Two things stand out.
+`set_foundation_massage()` always sends all five fields including
+`massageWaveMode`. The most likely reading is that this foundation rejects that
+field, or that Full Body patterns use a different field or endpoint entirely -
+note the app gives Full Body its **own separate Start Timer**, which hints at a
+separate control path rather than a variant of the same one.
 
-**The app sends partial payloads.** Head alone, timer alone, foot plus timer.
-`set_foundation_massage()` always sends all five fields
-(`footMassageMotor`, `headMassageMotor`, `massageTimer`, `massageWaveMode`,
-`side`). The app and the library are speaking measurably different dialects to
-the same endpoint.
-
-**`massageWaveMode` never appears in any captured request**, and `waveMode` read
-back `0` in all 46 observed responses. So there is no evidence for what field or
-value a pattern actually uses - only that it is not what the library sends.
-
-That makes the earlier guess - that forcing both speeds to OFF leaves a wave
-pattern with no motor to run on - less likely than the simpler explanation that
-the field name or endpoint is wrong for this foundation.
+An earlier revision of this file guessed the cause was
+`set_foundation_massage()` forcing both motor speeds to OFF, leaving a pattern
+with no motor to run on. **That was wrong.** The app's own screen says "Adjust
+either foot and head **or** full body massage", so the exclusivity is the
+vendor's own design and the library models it correctly.
 
 ### How to settle it
 
-Run the app through a proxy and select each massage pattern in turn, then look
-at what `foundation/adjustment` receives. That yields both the correct field and
-the integer for every pattern including Smooth, at which point the enum can be
-extended and the writer corrected. Nothing here can be fixed by guessing.
+Capture the app while pressing Smooth, Revitalize and Wave in turn, and read
+what `foundation/adjustment` actually receives. That yields the correct field
+and the integer for each pattern in one pass. Until then this cannot be fixed by
+guessing, and the mode entity is left in place, non-functional, so the fix is a
+one-line change once the field is known.
 
-**Motor speed control is unaffected and works.** If you only need vibration, the
-two speed entities per side are sufficient and the mode entity can be ignored.
+**Speed control is unaffected and works.**
 
 ## Install
 
