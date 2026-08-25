@@ -79,6 +79,9 @@ class SleepIQMassage:
         self.mode: Mode = Mode.OFF
         self.timer: int = 0
         self.motor_status: int = 0
+        # Raw per-side block from the last GET, surfaced as entity attributes so
+        # the full field set can be observed while the vendor app drives the bed.
+        self.raw: dict[str, Any] = {}
 
     @property
     def side_full(self) -> str:
@@ -95,6 +98,7 @@ class SleepIQMassage:
     def apply(self, payload: dict[str, Any]) -> None:
         """Update this side from a foundation/massage response."""
         block = payload.get(_SIDE_KEY[self.side]) or {}
+        self.raw = dict(block)
         self.foot_speed = _coerce(Speed, block.get("footMassageMotorSpeed"), Speed.OFF)
         self.head_speed = _coerce(Speed, block.get("headMassageMotorSpeed"), Speed.OFF)
         self.mode = _coerce(Mode, block.get("waveMode"), Mode.OFF)

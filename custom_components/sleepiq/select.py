@@ -1,6 +1,6 @@
 """Support for SleepIQ foundation preset selection."""
 
-from typing import override
+from typing import Any, override
 
 from asyncsleepiq import (
     CoreTemps,
@@ -228,6 +228,16 @@ class SleepIQMassageModeSelect(
         self.massage = massage
         sleeper = sleeper_for_side(bed, massage.side)
         super().__init__(coordinator, bed, sleeper, MASSAGE_MODE)
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose the raw foundation/massage block for this side.
+
+        Diagnostic: lets the full field set be observed while the vendor app
+        drives the bed, which is how the pattern behaviour is being worked out.
+        """
+        return dict(self.massage.raw)
 
     @callback
     @override
