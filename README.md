@@ -140,31 +140,38 @@ is `OFF=0 / SOOTHE=1 / REVITILIZE=2 / WAVE=3` - same order, so `SOOTHE` **is**
 Smooth. The translations use the app's wording. Nothing is missing from the
 list.
 
-### The write side fails, and two guesses at why were both wrong
+### The write starts the pattern, but it does not sustain
 
-| Field sent | Result |
+**The request is not rejected.** The bed's owner watched the mattress and
+reported that the side "did turn on for a bit" during a test that HA had
+recorded as a total failure. The pattern starts, runs briefly, and stops - and
+because `waveMode` reads back `0` once it has stopped, the API view alone made
+it look like nothing had happened.
+
+That is worth stating plainly: the API state was consistent with "request
+rejected" and was wrong. Only watching the hardware distinguished the two.
+
+Three request shapes have been tried, all on an **idle** side:
+
+| Sent | Result |
 | --- | --- |
-| `massageWaveMode` (what `set_foundation_massage()` sends) | rejected |
-| `waveMode` (what the GET returns) | rejected |
+| `massageWaveMode` + all five fields (`set_foundation_massage()`) | starts, stops |
+| `waveMode` + `massageTimer` | starts, stops |
+| `waveMode` alone | starts, stops |
 
-Both were tried on an **idle** side with no massage running, so a
-"cannot change mode mid-massage" explanation does not hold either. In both cases
-the bed discarded the whole request - the auto-armed timer was cleared too,
-though identical timer logic works on a speed write.
+By contrast, a pattern set from the **vendor phone app** persists: Smooth for
+one hour showed `mode=soothe`, `timer=60.0` in Home Assistant, still counting
+down minutes later.
 
-**Stop guessing field names here.** Two plausible ones have failed. The vendor
-app drives these patterns successfully, so the correct request shape exists and
-is observable.
+So the correct request differs from all three of the above in some way that has
+not been guessed. Three attempts, three failures - the remaining move is to
+observe the real request rather than infer it.
 
-### How to settle it
-
-Capture the app while pressing Smooth, Revitalize and Wave, and read what
-`foundation/adjustment` actually receives. One pass gives the field name and the
-integer for all three. Worth noting the app gives Full Body its **own separate
-Start Timer**, so the patterns may not use `foundation/adjustment` at all.
-
-The mode entity is left in place, reading correctly and writing nothing, so the
-fix is a one-line change once the request shape is known.
+Likely direction, from the app's own UI: the massage screen gives **Full Body
+its own Start Timer**, separate from the Foot/Head one. A pattern may need that
+timer armed through a different field or endpoint, and without it the foundation
+runs a brief burst and stops. That is a hypothesis and is not to be treated as
+more than one.
 
 ### What did change
 
