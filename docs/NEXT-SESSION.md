@@ -68,3 +68,66 @@ capture at all.
 `custom_components/sleepiq/massage.py`, `SleepIQMassage.set_mode()`. It is a
 one-line change to the payload in `self._put({...})`. Everything else -
 entities, translations, state model, timer defaulting - is already in place.
+
+
+---
+
+# CI on Gitea (2026-08-25)
+
+Both repos moved off GitHub to the **the self-hosted Gitea** (`[forge-host]:3000`)
+because GitHub Actions minutes are a budget line. `origin` is Gitea; `github`
+remains as a secondary remote but nothing pushes there.
+
+## Identity — do not use the shared admin account
+
+Each repo authenticates as its **own non-admin Gitea user** with its **own SSH
+key**, because several agent sessions push to this forge and the shared
+`the shared admin account` password gets rotated out from under them (twice on 2026-08-25).
+
+    account  [repo-account]        non-admin, write on lewis/ha-sleepiq only
+    key      ~/.ssh/[repo-key]
+    remote   gitea-ha-sleepiq:lewis/ha-sleepiq.git
+
+⚠ The `~/.ssh/config` block is **alias-only, never the bare IP** — a block
+setting `Port`/`User` on the bare IP hijacks `ssh <user>@[forge-host]` for host
+shell access and breaks it for everyone.
+
+## What CI does now, and why it is one job
+
+`.gitea/workflows/validate.yml`. **The runner is shared and its capacity is 1**,
+so an ordinary push runs ONE fast job; hassfest and HACS are
+`workflow_dispatch` only. Do not raise capacity to make it faster — that was
+tried and act_runner v0.6.1 corrupted job contexts.
+
+The lint job: pinned ruff, the vendored-baseline guard, JSON validity, manifest
+sanity, and a check that core-only `[%key:...]` refs have not returned.
+
+## Three CI traps already paid for — do not rediscover them
+
+1. **Pin the linter.** The job passed locally and failed in CI purely because
+   `pip install ruff` fetched a newer default rule set. Pinned to `0.15.21`.
+2. **`ruff.toml` mirrors core's isort config.** 20 of 23 initial errors were in
+   `sensor.py`/`switch.py` — vendored files this project never touched.
+   Reformatting them would break every hash in `UPSTREAM-BASELINE.txt` and make
+   upstream resyncs harder for no benefit. The CI baseline guard now fails if a
+   vendored file drifts, which is damage nothing else would catch.
+3. **No `ast.parse` step.** One existed and failed *valid* code: HA needs
+   Python 3.13 and uses PEP 695 `type X = ...`, while the runner image ships
+   **Python 3.10.12**. Ruff already parses at `py313`. Do not reintroduce it
+   without pinning a 3.13 toolchain.
+
+## Reading CI results without admin
+
+The admin credential was rotated, so the Actions API is not available. Logs live
+on the box:
+
+    ssh <user>@[forge-host]
+    sudo docker exec gitea sh -c 'find /data/gitea/actions_log/lewis/ha-sleepiq -name "*.log.zst"'
+    sudo docker cp gitea:<path> /tmp/x.zst && zstd -dc /tmp/x.zst | ...
+
+⛔ **A missing log file does NOT mean the task was never created.** Logs appear
+only once a job *starts*. With capacity 1 and other agents queued ahead, a task
+can exist and be waiting with no log on disk. That was misread once as "the
+scheduler is broken" when the real state was "queued behind someone else's
+pytest run". Check `docker ps` for a `GITEA-ACTIONS-*` container before
+concluding anything.
