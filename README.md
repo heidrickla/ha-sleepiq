@@ -28,10 +28,16 @@ Per side, for beds whose foundation reports the massage board:
 
 | Entity | Platform | Values |
 | --- | --- | --- |
-| `{bed} {side} Massage Mode` | `select` | off, soothe, revitalize, wave |
-| `{bed} {side} Foot Massage Speed` | `select` | off, low, medium, high |
-| `{bed} {side} Head Massage Speed` | `select` | off, low, medium, high |
-| `{bed} {side} Massage Timer` | `number` | 0-30 minutes |
+| `{bed} {sleeper} Massage Mode` | `select` | off, soothe, revitalize, wave |
+| `{bed} {sleeper} Foot Massage Speed` | `select` | off, low, medium, high |
+| `{bed} {sleeper} Head Massage Speed` | `select` | off, low, medium, high |
+| `{bed} {sleeper} Massage Timer` | `number` | 0-30 minutes |
+
+Entities are named by **sleeper**, not by physical side - "Lewis Massage Mode",
+not "Right Massage Mode" - matching how core names the other per-sleeper comfort
+hardware (foot warmer, core climate) via its `sleeper_for_side()` helper. Nobody
+reaching for the massage control wants to first work out which side they sleep
+on.
 
 Entities are created only when the foundation advertises massage —
 `hasMassageAndLight`, which the library derives from bit 1 of `fsBoardFeatures`.
@@ -58,7 +64,26 @@ created, four per side, and the integration loaded with no errors.
 | --- | --- |
 | Motor speed write and readback | **pass** - setting foot speed to `low` reads back `low` from the bed |
 | Mode cancels speed | **pass** - selecting a mode drove foot speed to `off` |
+| All four motors, both sides, HIGH | **pass** - confirmed by the bed's occupants |
+| Sleeper-to-side mapping | **pass** - left and right resolve to the correct sleepers |
 | Wave mode engages | **fails** - see below |
+| Timer holds its value | **unreliable** - see below |
+
+## Known issue: the timer is probably a countdown, not a setting
+
+`massageTimer` is exposed as a `number`, but the evidence suggests it is a
+**live countdown rather than a stored preference**. In a packet capture of the
+vendor app, the running side reported `massageTimer: 57` alongside
+`massageRunTime: 3` while the idle side reported `0`.
+
+Observed symptom: setting the timer then immediately setting a speed can leave
+the timer reading `0`. Every write sends the whole payload - that is the API's
+shape, not a choice - so a coordinator refresh landing mid-sequence can replace
+the local timer with the bed's own value before the speed write re-sends it.
+
+Until the semantics are confirmed, treat the timer entity as advisory. Set it
+*before* starting a massage and re-check it afterwards rather than assuming it
+held. An `off` write to both speed entities always stops the motors regardless.
 
 ## Known issue: wave mode does not stick
 

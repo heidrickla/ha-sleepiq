@@ -204,9 +204,15 @@ class SleepIQCoreTempSelectEntity(
 
 
 class SleepIQMassageModeSelect(
-    SleepIQBedEntity[SleepIQDataUpdateCoordinator], SelectEntity
+    SleepIQSleeperEntity[SleepIQDataUpdateCoordinator], SelectEntity
 ):
-    """Wave-mode selection for one side of the bed."""
+    """Wave-mode selection for one sleeper's side of the bed.
+
+    Named by sleeper rather than by physical side, matching how core names the
+    other per-sleeper comfort hardware (foot warmer, core climate). "Lewis
+    Massage Mode" is what someone reaches for; "Right Massage Mode" makes them
+    work out which side they are.
+    """
 
     _attr_icon = "mdi:vibrate"
     _attr_translation_key = "massage_mode"
@@ -220,11 +226,8 @@ class SleepIQMassageModeSelect(
     ) -> None:
         """Initialize the massage mode select."""
         self.massage = massage
-        self._attr_name = (
-            f"SleepNumber {bed.name} {massage.side_full} Massage Mode"
-        )
-        self._attr_unique_id = f"{bed.id}_{MASSAGE_MODE}_{massage.side.value}"
-        super().__init__(coordinator, bed)
+        sleeper = sleeper_for_side(bed, massage.side)
+        super().__init__(coordinator, bed, sleeper, MASSAGE_MODE)
 
     @callback
     @override
@@ -247,9 +250,9 @@ class SleepIQMassageModeSelect(
 
 
 class SleepIQMassageSpeedSelect(
-    SleepIQBedEntity[SleepIQDataUpdateCoordinator], SelectEntity
+    SleepIQSleeperEntity[SleepIQDataUpdateCoordinator], SelectEntity
 ):
-    """Motor speed selection for the head or foot motor on one side."""
+    """Motor speed for the head or foot motor on one sleeper's side."""
 
     _attr_icon = "mdi:vibrate"
     _attr_options = [speed.name.lower() for speed in Speed]
@@ -266,12 +269,8 @@ class SleepIQMassageSpeedSelect(
         self.massage = massage
         self.end = end
         self._attr_translation_key = key
-        self._attr_name = (
-            f"SleepNumber {bed.name} {massage.side_full} {end.capitalize()}"
-            " Massage Speed"
-        )
-        self._attr_unique_id = f"{bed.id}_{key}_{massage.side.value}"
-        super().__init__(coordinator, bed)
+        sleeper = sleeper_for_side(bed, massage.side)
+        super().__init__(coordinator, bed, sleeper, key)
 
     @property
     def _speed(self) -> Speed:

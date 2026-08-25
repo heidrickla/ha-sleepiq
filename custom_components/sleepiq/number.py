@@ -99,13 +99,13 @@ async def _async_set_massage_time(massage: SleepIQMassage, time: int) -> None:
 
 
 def _get_massage_timer_name(bed: SleepIQBed, massage: SleepIQMassage) -> str:
-    return (
-        f"SleepNumber {bed.name} {massage.side_full} {ENTITY_TYPES[MASSAGE_TIMER]}"
-    )
+    sleeper = sleeper_for_side(bed, massage.side)
+    return f"SleepNumber {bed.name} {sleeper.name} {ENTITY_TYPES[MASSAGE_TIMER]}"
 
 
 def _get_massage_timer_unique_id(bed: SleepIQBed, massage: SleepIQMassage) -> str:
-    return f"{bed.id}_{MASSAGE_TIMER}_{massage.side.value}"
+    sleeper = sleeper_for_side(bed, massage.side)
+    return f"{sleeper.sleeper_id}_{MASSAGE_TIMER}"
 
 
 def _get_foot_warming_name(bed: SleepIQBed, foot_warmer: SleepIQFootWarmer) -> str:
