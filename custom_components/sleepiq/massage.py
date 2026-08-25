@@ -107,18 +107,29 @@ class SleepIQMassage:
         except (TypeError, ValueError):
             self.motor_status = 0
 
-    async def _push(self) -> None:
-        """Send the current desired state to the bed.
+    async def _put(self, data: dict[str, Any]) -> None:
+        """Send one partial update, the way the vendor app does.
 
-        Goes through the library's own writer so the payload shape stays the
-        library's problem, not ours.
+        `set_foundation_massage()` always sends all five fields, including
+        `massageWaveMode`. The app never sends that field and only ever sends
+        partial payloads - `{"headMassageMotor": 3, "side": "R"}`, and so on.
+        A full-payload write is discarded wholesale by this foundation: setting
+        a mode left both the mode AND the auto-armed timer at zero, while the
+        identical timer logic works on a speed write.
+
+        Note the read side returns `waveMode`, not `massageWaveMode`.
         """
-        await self._foundation.set_foundation_massage(
-            self.side,
-            self.foot_speed,
-            self.head_speed,
-            self.timer,
-            self.mode,
+        data["side"] = self.side
+        await self._api.put(f"bed/{self.bed_id}/foundation/adjustment", data)
+
+    async def _push_speeds(self) -> None:
+        """Push motor speeds, matching the app's own request shape."""
+        await self._put(
+            {
+                "footMassageMotor": int(self.foot_speed),
+                "headMassageMotor": int(self.head_speed),
+                "massageTimer": self.timer,
+            }
         )
 
     async def set_mode(self, mode: Mode) -> None:
@@ -128,7 +139,7 @@ class SleepIQMassage:
             self.foot_speed = Speed.OFF
             self.head_speed = Speed.OFF
             self.timer = self.timer or MASSAGE_DEFAULT_TIMER
-        await self._push()
+        await self._put({"waveMode": int(mode), "massageTimer": self.timer})
 
     async def set_speeds(
         self, foot_speed: Speed | None = None, head_speed: Speed | None = None
@@ -141,19 +152,20 @@ class SleepIQMassage:
         if self.foot_speed != Speed.OFF or self.head_speed != Speed.OFF:
             self.mode = Mode.OFF
             self.timer = self.timer or MASSAGE_DEFAULT_TIMER
-        await self._push()
+        await self._push_speeds()
 
     async def set_timer(self, minutes: int) -> None:
         """Set the massage timer in minutes."""
         self.timer = max(MASSAGE_TIMER_MIN, min(MASSAGE_TIMER_MAX, int(minutes)))
-        await self._push()
+        await self._put({"massageTimer": self.timer})
 
     async def turn_off(self) -> None:
         """Stop massage on this side."""
         self.mode = Mode.OFF
         self.foot_speed = Speed.OFF
         self.head_speed = Speed.OFF
-        await self._push()
+        await self._put({"waveMode": 0})
+        await self._push_speeds()
 
 
 def build_massage_sides(bed: SleepIQBed) -> list[SleepIQMassage]:
