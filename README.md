@@ -67,23 +67,41 @@ created, four per side, and the integration loaded with no errors.
 | All four motors, both sides, HIGH | **pass** - confirmed by the bed's occupants |
 | Sleeper-to-side mapping | **pass** - left and right resolve to the correct sleepers |
 | Wave mode engages | **fails** - see below |
-| Timer holds its value | **unreliable** - see below |
+| Timer holds its value | **expires when idle** - see below |
 
-## Known issue: the timer is probably a countdown, not a setting
+## Known issue: the timer expires if massage is not started
 
-`massageTimer` is exposed as a `number`, but the evidence suggests it is a
-**live countdown rather than a stored preference**. In a packet capture of the
-vendor app, the running side reported `massageTimer: 57` alongside
-`massageRunTime: 3` while the idle side reported `0`.
+`massageTimer` is exposed as a `number`, but it behaves as an **armed
+countdown, not a stored preference**. Measured on hardware:
 
-Observed symptom: setting the timer then immediately setting a speed can leave
-the timer reading `0`. Every write sends the whole payload - that is the API's
-shape, not a choice - so a coordinator refresh landing mid-sequence can replace
-the local timer with the bed's own value before the speed write re-sends it.
+| Action | Left | Right |
+| --- | --- | --- |
+| baseline | 0.0 | 0.0 |
+| set left = 7 | **7.0** | 0.0 |
+| +45 s, no motors started | **0.0** | 0.0 |
+| set right = 12 | 0.0 | **12.0** |
+| right speed -> low | 0.0 | **12.0** |
 
-Until the semantics are confirmed, treat the timer entity as advisory. Set it
-*before* starting a massage and re-check it afterwards rather than assuming it
-held. An `off` write to both speed entities always stops the motors regardless.
+Two things follow.
+
+**The timers are per-side and independent.** Setting one never moves the other,
+so the value on one side tells you nothing about the other. There is no shared
+bed-wide timer to read.
+
+**An idle timer clears itself.** Left was set to 7 and read back 7, then fell to
+0 within 45 seconds with no motors running. The right side, which had a motor
+started while its timer was set, held its value. The consistent reading is that
+the bed arms the timer and drops it if a massage does not begin - though the
+exact window has not been measured.
+
+So: **set the timer, then start the massage promptly.** Setting a timer and
+walking away leaves nothing armed.
+
+An earlier revision of this file blamed a write race - every request sends the
+whole payload, so a coordinator refresh landing mid-sequence was assumed to
+overwrite the local timer. **That was wrong.** A speed write does not disturb
+the timer at all, as the table above shows. The correct explanation is
+expiry, and it was found by testing the claim rather than reasoning about it.
 
 ## Known issue: wave mode does not stick
 
