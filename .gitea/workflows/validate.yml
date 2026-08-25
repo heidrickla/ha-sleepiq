@@ -1,0 +1,88 @@
+name: Validate
+
+# Gitea Actions. Runs on the self-hosted act_runner on a self-hosted runner rather than
+# GitHub-hosted runners, which is the point - GitHub Actions minutes are a
+# budget line and this hardware is already paid for.
+#
+# The GitHub workflow is kept at .github/workflows/validate.yml so the repo
+# still validates if it is ever mirrored back, but nothing pushes there now.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Native checks first: no third-party actions, so this job is the one that
+  # always tells the truth about the code even if the Docker-based HA actions
+  # cannot fetch or run on this runner.
+  lint:
+    name: Lint and structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        run: |
+          python3 --version
+          python3 -m pip install --quiet --upgrade pip
+          python3 -m pip install --quiet ruff
+
+      - name: Ruff
+        run: python3 -m ruff check custom_components/
+
+      - name: Every module parses
+        run: |
+          for f in custom_components/sleepiq/*.py; do
+            python3 -c "import ast,sys; ast.parse(open(sys.argv[1],encoding='utf-8').read())" "$f" || exit 1
+          done
+          echo "all modules parse"
+
+      - name: JSON is valid
+        run: |
+          for f in custom_components/sleepiq/*.json hacs.json; do
+            python3 -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "$f" || exit 1
+            echo "  ok $f"
+          done
+
+      - name: Manifest sanity
+        run: |
+          python3 - <<'PY'
+          import json
+          m = json.load(open("custom_components/sleepiq/manifest.json", encoding="utf-8"))
+          missing = [k for k in ("domain","name","version","documentation","codeowners") if not m.get(k)]
+          assert not missing, f"manifest missing: {missing}"
+          assert m["domain"] == "sleepiq", m["domain"]
+          # A custom component MUST carry a version or Home Assistant refuses to load it.
+          assert m["version"], "version is required for a custom integration"
+          print("manifest ok:", m["domain"], m["version"])
+          PY
+
+      - name: No core-only translation refs
+        # strings.json in HA core uses [%key:common::...] references that only
+        # resolve inside core's build. In a custom component they render as raw
+        # keys, so they must not come back during an upstream resync.
+        run: |
+          if grep -q '%key:' custom_components/sleepiq/strings.json; then
+            echo "core-only [%key:...] reference found - replace with a literal"
+            exit 1
+          fi
+          echo "no core-only refs"
+
+  hassfest:
+    name: hassfest
+    runs-on: ubuntu-latest
+    continue-on-error: true   # third-party action; do not fail the run if it cannot fetch
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
