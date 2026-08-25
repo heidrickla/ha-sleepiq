@@ -1,0 +1,22 @@
+# Ruff config for a repo that VENDORS Home Assistant core code.
+#
+# custom_components/sleepiq/ is a copy of homeassistant/components/sleepiq/ at
+# tag 2026.8.2 plus massage support. Core formats its imports under its own
+# isort settings, so linting those files with ruff's defaults reports I001 on
+# code this project did not write and must not reformat.
+#
+# Reformatting is not a harmless fix here: docs/UPSTREAM-BASELINE.txt records
+# the SHA-256 of every vendored file so an upstream resync stays a small,
+# reviewable diff. Re-sorting their imports would break every one of those
+# hashes and make future syncs materially harder, in exchange for nothing.
+#
+# So: adopt core's isort settings rather than fight them.
+# Mirrors home-assistant/core pyproject.toml [tool.ruff.lint.isort].
+
+target-version = "py313"
+
+[lint.isort]
+force-sort-within-sections = true
+known-first-party = ["homeassistant"]
+combine-as-imports = true
+split-on-trailing-comma = false
