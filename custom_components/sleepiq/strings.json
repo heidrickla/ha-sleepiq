@@ -1,0 +1,74 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Account is already configured",
+      "reauth_successful": "Re-authentication was successful"
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication"
+    },
+    "step": {
+      "reauth_confirm": {
+        "data": {
+          "password": "Password"
+        },
+        "description": "The SleepIQ integration needs to re-authenticate your account {username}.",
+        "title": "Reauthenticate integration"
+      },
+      "user": {
+        "data": {
+          "password": "Password",
+          "username": "Username"
+        }
+      }
+    }
+  },
+  "entity": {
+    "select": {
+      "core_temps": {
+        "state": {
+          "cooling_high": "Cooling high",
+          "cooling_low": "Cooling low",
+          "cooling_medium": "Cooling medium",
+          "heating_high": "Heating high",
+          "heating_low": "Heating low",
+          "heating_medium": "Heating medium",
+          "off": "Off"
+        }
+      },
+      "foot_warmer_temp": {
+        "state": {
+          "high": "High",
+          "low": "Low",
+          "medium": "Medium",
+          "off": "Off"
+        }
+      },
+      "massage_mode": {
+        "state": {
+          "off": "Off",
+          "soothe": "Soothe",
+          "revitilize": "Revitalize",
+          "wave": "Wave"
+        }
+      },
+      "massage_foot_speed": {
+        "state": {
+          "off": "Off",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      },
+      "massage_head_speed": {
+        "state": {
+          "off": "Off",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      }
+    }
+  }
+}

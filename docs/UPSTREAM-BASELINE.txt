@@ -1,0 +1,18 @@
+# SHA-256 of each file as copied from home-assistant/core tag 2026.8.2
+# Re-check these when syncing; a changed hash means upstream moved.
+
+  b19d145df99ef32faa28c2180fab1254d0782a1178c837212fe211a81a2b4a19 *__init__.py
+  ea8062ee1c5330219376400dfcdc37b56e52d5779c88e9a5fdd0a14fca360aff *binary_sensor.py
+  4a057a1745ff5dbe0de2270cb6c57d680bf2dd9b5b149d8ad7763225b90d0a0b *button.py
+  81083f7a042cfb8979026760baba0060234594d43475d63a95ab594daa647567 *config_flow.py
+  5ee5c6412bf22a3bf2fc6647d67bfd294ba3ecf04c5b6123ebed6460030b6fb2 *const.py
+  bcde6c238abdfb597ea1eb12c8322ab10fec0160536a7304f2e6afdd34e2b939 *coordinator.py
+  c60e721a415d71416e95b840f9336add1a3f4e3d601a0889d873461ac3903c10 *entity.py
+  29d9e06c2fad641524c81aaf1d065a78051ec0686de867fcc9bd7bbf98007261 *light.py
+  a23e9b683f54e64c427cd0efb070ac52ef252743500282ae0303974ed9171559 *number.py
+  68d1471c15b2a7bfba2594b7b7d7ce28edac9ae80c9c372394ab30068c9df6c9 *select.py
+  71ccf335aaf8d1d0859e12e0bb302e3e050e533e31efdbfba37020a4d422123c *sensor.py
+  7af61e23d6915c2d18d48e9e01dc901c70e1353ac771b1f3f4b31b64a3ba1ff3 *switch.py
+  a05546e8806f1a31205214b7dd1895515c5b9c85d1127d39a5fc33b79cecb289 *icons.json
+  cb54d5859478560ebd8a7fbdc2cf6a75c0400f6c789dac6df1bfea40a0d066f0 *manifest.json
+  740fa754f1b82a9caa355b492dab33e2d70058a6147f5b2d6ee2bbf1a8557800 *strings.json
