@@ -121,60 +121,58 @@ overwrite the local timer. **That was wrong.** A speed write does not disturb
 the timer at all, as the table above shows. The correct explanation is
 expiry, and it was found by testing the claim rather than reasoning about it.
 
-## Known issue: the full-body patterns do not work
+## Known issue: the full-body patterns cannot be set from Home Assistant
 
-The Foot/Head speed controls work. The **Full Body** patterns - Smooth,
-Revitalize, Wave - do not. Selecting one is silently ignored by the bed.
+Foot/Head speed control works. The **Full Body** patterns - Smooth, Revitalize,
+Wave - can be *read* but not *written*.
+
+### The read side is correct
+
+Confirmed on hardware: setting **Smooth for 1 hour from the vendor phone app**
+showed up in Home Assistant within one poll as `mode=soothe`, `timer=60.0`,
+counting down to 58 a couple of minutes later. So `waveMode 1 = Smooth`, the
+timer is in minutes, and 60 is the maximum. The state model is right.
 
 ### Naming
 
-The vendor app's Full Body row reads `Off / Smooth / Revitalize / Wave`. The
-library's enum is `OFF=0 / SOOTHE=1 / REVITILIZE=2 / WAVE=3` - the same order,
-so `SOOTHE` **is** Smooth. The translations use the app's wording, since that is
-what is printed in front of the user. Nothing is missing from the list; one
-entry was just labelled with the library's internal name.
+The app's Full Body row is `Off / Smooth / Revitalize / Wave`; the library enum
+is `OFF=0 / SOOTHE=1 / REVITILIZE=2 / WAVE=3` - same order, so `SOOTHE` **is**
+Smooth. The translations use the app's wording. Nothing is missing from the
+list.
 
-### Why they fail
+### The write side fails, and two guesses at why were both wrong
 
-Measured, same bed, minutes apart:
+| Field sent | Result |
+| --- | --- |
+| `massageWaveMode` (what `set_foundation_massage()` sends) | rejected |
+| `waveMode` (what the GET returns) | rejected |
 
-| Write | Mode after | Timer after |
-| --- | --- | --- |
-| foot speed = low | - | **60** (auto-armed) |
-| mode = smooth | **0** | **0** |
+Both were tried on an **idle** side with no massage running, so a
+"cannot change mode mid-massage" explanation does not hold either. In both cases
+the bed discarded the whole request - the auto-armed timer was cleared too,
+though identical timer logic works on a speed write.
 
-The mode write did not merely fail to set a mode - **the auto-armed timer did
-not take either**, though the identical timer logic works on the speed path.
-The bed is discarding the *entire request*, not just one field.
-
-That matches the packet capture of the vendor app, which never sends
-`massageWaveMode` in any request and only ever sends partial payloads:
-
-    {"footMassageMotor": 3, "massageTimer": 15, "side": "R"}
-    {"headMassageMotor": 3, "side": "R"}
-    {"massageTimer": 60, "side": "R"}
-
-`set_foundation_massage()` always sends all five fields including
-`massageWaveMode`. The most likely reading is that this foundation rejects that
-field, or that Full Body patterns use a different field or endpoint entirely -
-note the app gives Full Body its **own separate Start Timer**, which hints at a
-separate control path rather than a variant of the same one.
-
-An earlier revision of this file guessed the cause was
-`set_foundation_massage()` forcing both motor speeds to OFF, leaving a pattern
-with no motor to run on. **That was wrong.** The app's own screen says "Adjust
-either foot and head **or** full body massage", so the exclusivity is the
-vendor's own design and the library models it correctly.
+**Stop guessing field names here.** Two plausible ones have failed. The vendor
+app drives these patterns successfully, so the correct request shape exists and
+is observable.
 
 ### How to settle it
 
-Capture the app while pressing Smooth, Revitalize and Wave in turn, and read
-what `foundation/adjustment` actually receives. That yields the correct field
-and the integer for each pattern in one pass. Until then this cannot be fixed by
-guessing, and the mode entity is left in place, non-functional, so the fix is a
-one-line change once the field is known.
+Capture the app while pressing Smooth, Revitalize and Wave, and read what
+`foundation/adjustment` actually receives. One pass gives the field name and the
+integer for all three. Worth noting the app gives Full Body its **own separate
+Start Timer**, so the patterns may not use `foundation/adjustment` at all.
 
-**Speed control is unaffected and works.**
+The mode entity is left in place, reading correctly and writing nothing, so the
+fix is a one-line change once the request shape is known.
+
+### What did change
+
+Writes now use the app's **partial-payload dialect** rather than the library's
+all-five-fields call - `{"footMassageMotor": N, "headMassageMotor": N,
+"massageTimer": N, "side": "R"}` - matching what the app was observed sending.
+Speed control was regression-tested after the change and still works, with the
+timer arming correctly.
 
 ## Install
 
