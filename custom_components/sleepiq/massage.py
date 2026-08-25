@@ -139,7 +139,11 @@ class SleepIQMassage:
             self.foot_speed = Speed.OFF
             self.head_speed = Speed.OFF
             self.timer = self.timer or MASSAGE_DEFAULT_TIMER
-        await self._put({"waveMode": int(mode), "massageTimer": self.timer})
+        # Send waveMode ALONE. The app's massage screen gives Full Body its own
+        # Start Timer, separate from the Foot/Head one, so massageTimer here
+        # probably arms the wrong timer and leaves the pattern with none - which
+        # matches the observed behaviour of it running briefly then stopping.
+        await self._put({"waveMode": int(mode)})
 
     async def set_speeds(
         self, foot_speed: Speed | None = None, head_speed: Speed | None = None
