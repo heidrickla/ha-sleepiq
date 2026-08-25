@@ -30,9 +30,17 @@ _SIDE_KEY = {Side.LEFT: "leftSide", Side.RIGHT: "rightSide"}
 
 MASSAGE_ENDPOINT = "foundation/massage"
 
-# The API accepts a timer in minutes. The app offers these; 0 means "no timer".
+# Timer is in minutes. 60 is the maximum the vendor app and the physical remotes
+# offer, which corroborates the countdown reading: a capture of a running
+# massage reported massageTimer 57, i.e. 57 minutes left of a 60 minute run.
 MASSAGE_TIMER_MIN = 0
-MASSAGE_TIMER_MAX = 30
+MASSAGE_TIMER_MAX = 60
+
+# Armed automatically when a massage is started with no timer set. The bed drops
+# an idle timer, so starting a massage without one means nothing stops it.
+# Mirrors core's own defaulting for comparable hardware, e.g.
+# `timer = self.foot_warmer.timer or 120`.
+MASSAGE_DEFAULT_TIMER = 60
 
 
 def _coerce[_EnumT: (Speed, Mode)](enum_cls: type[_EnumT], raw: Any, default: _EnumT) -> _EnumT:
@@ -112,6 +120,7 @@ class SleepIQMassage:
         if mode != Mode.OFF:
             self.foot_speed = Speed.OFF
             self.head_speed = Speed.OFF
+            self.timer = self.timer or MASSAGE_DEFAULT_TIMER
         await self._push()
 
     async def set_speeds(
@@ -124,6 +133,7 @@ class SleepIQMassage:
             self.head_speed = head_speed
         if self.foot_speed != Speed.OFF or self.head_speed != Speed.OFF:
             self.mode = Mode.OFF
+            self.timer = self.timer or MASSAGE_DEFAULT_TIMER
         await self._push()
 
     async def set_timer(self, minutes: int) -> None:
