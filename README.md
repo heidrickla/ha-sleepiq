@@ -48,6 +48,41 @@ motor speeds to OFF whenever a wave mode is set. So:
 The entities mirror that deliberately. If they did not, the UI would show a
 state the bed is not in.
 
+## Verified on hardware
+
+Deployed to Home Assistant 2026.8.2 against a SelectComfort i8
+(`fsBoardFeatures = 7`, so `hasMassageAndLight` is set). Eight entities were
+created, four per side, and the integration loaded with no errors.
+
+| Test | Result |
+| --- | --- |
+| Motor speed write and readback | **pass** - setting foot speed to `low` reads back `low` from the bed |
+| Mode cancels speed | **pass** - selecting a mode drove foot speed to `off` |
+| Wave mode engages | **fails** - see below |
+
+## Known issue: wave mode does not stick
+
+Selecting a wave mode (`soothe` / `revitilize` / `wave`) reaches the bed - the
+motor speeds go to off, which is the API's mutual-exclusion behaviour, so the
+write is clearly landing - but the mode itself reads back as `off` on the next
+refresh. No error is logged and the request succeeds.
+
+The likely cause is in `set_foundation_massage()` upstream: it forces **both
+motor speeds to OFF whenever a mode is set**. If the foundation will not run a
+wave pattern with both motors at zero speed, it accepts the command, runs
+nothing, and correctly reports `waveMode: 0`.
+
+That is a hypothesis, not a diagnosis. It has not been confirmed, and it may
+instead be that this foundation simply does not implement wave modes.
+
+**Motor speed control - the part that actually vibrates the bed - works.** If
+you only need vibration, the two speed entities per side are sufficient and the
+mode entity can be ignored.
+
+To investigate: set a mode *and* a non-zero speed in one request and see whether
+`waveMode` survives. That contradicts the library's current behaviour, so it
+would need a library change rather than a change here.
+
 ## Install
 
 **HACS** — add this repository as a custom repository (category: Integration),
