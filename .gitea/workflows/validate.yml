@@ -69,12 +69,13 @@ jobs:
           print(f"{len(base)-len(OWNED)} vendored file(s) match upstream")
           PY
 
-      - name: Every module parses
-        run: |
-          for f in custom_components/sleepiq/*.py; do
-            python3 -c "import ast,sys; ast.parse(open(sys.argv[1],encoding='utf-8').read())" "$f" || exit 1
-          done
-          echo "all modules parse"
+      # NOTE: there is deliberately no separate ast.parse step.
+      # An earlier version had one and it failed on valid code: Home Assistant
+      # requires Python 3.13 and uses PEP 695 `type X = ...` statements, while
+      # this runner image (ubuntu:act-22.04) ships an older python3 that cannot
+      # parse them. Ruff already parses every file at target-version py313 per
+      # ruff.toml, so the check was both redundant and running under the wrong
+      # interpreter. Do not reintroduce it without pinning a 3.13 toolchain.
 
       - name: JSON is valid
         run: |
