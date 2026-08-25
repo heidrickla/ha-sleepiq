@@ -121,28 +121,49 @@ overwrite the local timer. **That was wrong.** A speed write does not disturb
 the timer at all, as the table above shows. The correct explanation is
 expiry, and it was found by testing the claim rather than reasoning about it.
 
-## Known issue: wave mode does not stick
+## Known issue: wave mode does not stick, and "Smooth" is missing
 
-Selecting a wave mode (`soothe` / `revitilize` / `wave`) reaches the bed - the
-motor speeds go to off, which is the API's mutual-exclusion behaviour, so the
-write is clearly landing - but the mode itself reads back as `off` on the next
-refresh. No error is logged and the request succeeds.
+The mode entity offers `off / soothe / revitilize / wave`, taken from the
+library's `Mode` enum. The vendor app exposes at least one pattern that is not
+in that list - **Smooth** - so the enum is probably incomplete.
 
-The likely cause is in `set_foundation_massage()` upstream: it forces **both
-motor speeds to OFF whenever a mode is set**. If the foundation will not run a
-wave pattern with both motors at zero speed, it accepts the command, runs
-nothing, and correctly reports `waveMode: 0`.
+Selecting any mode also fails to take. The write reaches the bed (the motor
+speeds go to off, which is the mutual-exclusion behaviour) but `waveMode` reads
+back `0` on the next refresh. No error is logged.
 
-That is a hypothesis, not a diagnosis. It has not been confirmed, and it may
-instead be that this foundation simply does not implement wave modes.
+### What a packet capture of the vendor app shows
 
-**Motor speed control - the part that actually vibrates the bed - works.** If
-you only need vibration, the two speed entities per side are sufficient and the
-mode entity can be ignored.
+Captured requests to `foundation/adjustment` while driving massage from the app:
 
-To investigate: set a mode *and* a non-zero speed in one request and see whether
-`waveMode` survives. That contradicts the library's current behaviour, so it
-would need a library change rather than a change here.
+    {"footMassageMotor": 3, "massageTimer": 15, "side": "R"}
+    {"headMassageMotor": 3, "side": "R"}
+    {"massageTimer": 60, "side": "R"}
+
+Two things stand out.
+
+**The app sends partial payloads.** Head alone, timer alone, foot plus timer.
+`set_foundation_massage()` always sends all five fields
+(`footMassageMotor`, `headMassageMotor`, `massageTimer`, `massageWaveMode`,
+`side`). The app and the library are speaking measurably different dialects to
+the same endpoint.
+
+**`massageWaveMode` never appears in any captured request**, and `waveMode` read
+back `0` in all 46 observed responses. So there is no evidence for what field or
+value a pattern actually uses - only that it is not what the library sends.
+
+That makes the earlier guess - that forcing both speeds to OFF leaves a wave
+pattern with no motor to run on - less likely than the simpler explanation that
+the field name or endpoint is wrong for this foundation.
+
+### How to settle it
+
+Run the app through a proxy and select each massage pattern in turn, then look
+at what `foundation/adjustment` receives. That yields both the correct field and
+the integer for every pattern including Smooth, at which point the enum can be
+extended and the writer corrected. Nothing here can be fixed by guessing.
+
+**Motor speed control is unaffected and works.** If you only need vibration, the
+two speed entities per side are sufficient and the mode entity can be ignored.
 
 ## Install
 
