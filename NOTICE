@@ -7,17 +7,29 @@ Version 2.0.
 
 The contents of custom_components/sleepiq/ are derived from
 homeassistant/components/sleepiq/ at tag 2026.8.2. The per-file SHA-256 hashes
-of that baseline are recorded in docs/UPSTREAM-BASELINE.txt.
+of that baseline are recorded in docs/UPSTREAM-BASELINE.txt, where each file
+this project edits is marked `modified`.
+
+Files added by this project, with no upstream counterpart:
+
+  * massage.py         - massage state model and control
+  * diagnostics.py     - diagnostics download
+  * quality_scale.yaml - Integration Quality Scale record
+  * translations/      - runtime translations (a copy of strings.json)
 
 Modifications by this project, relative to that baseline:
 
-  * added massage.py - massage state model and control
+  * __init__.py    - build massage objects during setup, translated setup
+                     exceptions, migration of massage unique ids
+  * config_flow.py - masked password selector on the user and reauth forms
   * const.py       - massage entity type constants
-  * __init__.py    - build massage objects during setup
-  * coordinator.py - fetch massage state on each refresh
-  * select.py      - massage mode and head/foot speed select entities
-  * number.py      - massage timer number entity
-  * strings.json   - massage translations; core-only [%key:...] references
-                     replaced with literals, which do not resolve outside core
+  * coordinator.py - fetch massage state on each refresh, translated poll
+                     exceptions, login failure raised as ConfigEntryAuthFailed
+  * select.py      - massage mode and head/foot speed select entities,
+                     PARALLEL_UPDATES
+  * number.py      - massage timer number entity, PARALLEL_UPDATES
+  * strings.json   - massage translations, field descriptions, exception
+                     messages; core-only [%key:...] references replaced with
+                     literals, which do not resolve outside core
   * icons.json     - massage icons
   * manifest.json  - custom component identity and version

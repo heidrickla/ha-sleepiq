@@ -1,5 +1,6 @@
 """Support for SleepIQ foundation preset selection."""
 
+from collections.abc import Coroutine
 from typing import Any, override
 
 from asyncsleepiq import (
@@ -7,19 +8,24 @@ from asyncsleepiq import (
     FootWarmingTemps,
     Mode,
     Side,
+    SleepIQAPIException,
     SleepIQBed,
     SleepIQCoreClimate,
     SleepIQFootWarmer,
+    SleepIQLoginException,
     SleepIQPreset,
+    SleepIQTimeoutException,
     Speed,
 )
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
     CORE_CLIMATE,
+    DOMAIN,
     FOOT_WARMER,
     MASSAGE_FOOT_SPEED,
     MASSAGE_HEAD_SPEED,
@@ -27,7 +33,11 @@ from .const import (
 )
 from .coordinator import SleepIQConfigEntry, SleepIQDataUpdateCoordinator
 from .entity import SleepIQBedEntity, SleepIQSleeperEntity, sleeper_for_side
-from .massage import SleepIQMassage
+from .massage import SleepIQMassage, massage_label
+
+# Every select writes to the bed; the cloud API is happiest with one request
+# in flight per account.
+PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(
@@ -37,7 +47,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up the SleepIQ foundation preset select entities."""
     data = entry.runtime_data
-    entities: list[SleepIQBedEntity] = []
+    entities: list[SleepIQBedEntity[SleepIQDataUpdateCoordinator]] = []
     for bed in data.client.beds.values():
         entities.extend(
             SleepIQSelectEntity(data.data_coordinator, bed, preset)
@@ -51,7 +61,7 @@ async def async_setup_entry(
             SleepIQCoreTempSelectEntity(data.data_coordinator, bed, core_climate)
             for core_climate in bed.foundation.core_climates
         )
-        for massage in getattr(bed.foundation, "massage_sides", []):
+        for massage in data.massage_sides.get(bed.id, []):
             entities.append(
                 SleepIQMassageModeSelect(data.data_coordinator, bed, massage)
             )
@@ -205,19 +215,65 @@ class SleepIQCoreTempSelectEntity(
         self.async_write_ha_state()
 
 
-class SleepIQMassageModeSelect(
-    SleepIQSleeperEntity[SleepIQDataUpdateCoordinator], SelectEntity
+class SleepIQMassageSelect(
+    SleepIQBedEntity[SleepIQDataUpdateCoordinator], SelectEntity
 ):
-    """Wave-mode selection for one sleeper's side of the bed.
+    """Common shape of the massage selects for one side of a bed.
 
     Named by sleeper rather than by physical side, matching how core names the
     other per-sleeper comfort hardware (foot warmer, core climate). "Lewis
-    Massage Mode" is what someone reaches for; "Right Massage Mode" makes them
-    work out which side they are.
+    massage mode" is what someone reaches for; "Right massage mode" makes them
+    work out which side they are. The unique id, though, is keyed on the
+    physical side, so a bed with one sleeper still gets two distinct entities.
     """
 
-    _attr_icon = "mdi:vibrate"
-    _attr_translation_key = "massage_mode"
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: SleepIQDataUpdateCoordinator,
+        bed: SleepIQBed,
+        massage: SleepIQMassage,
+        key: str,
+    ) -> None:
+        """Initialize a massage select."""
+        self.massage = massage
+        self._attr_translation_key = key
+        self._attr_translation_placeholders = {
+            "sleeper": massage_label(bed, massage.side)
+        }
+        self._attr_unique_id = f"{bed.id}_{massage.side.value}_{key}"
+        super().__init__(coordinator, bed)
+
+    @property
+    @override
+    def icon(self) -> None:
+        """No entity icon: icons.json supplies one through the translation key.
+
+        The bed base class sets _attr_icon to mdi:bed for every coordinator
+        entity, which would otherwise override the translated icon.
+        """
+        return None
+
+    async def _async_write(self, request: Coroutine[Any, Any, None]) -> None:
+        """Send one write to the bed, translating a refusal for the user."""
+        try:
+            await request
+        except (
+            SleepIQAPIException,
+            SleepIQLoginException,
+            SleepIQTimeoutException,
+        ) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="massage_write_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+
+
+class SleepIQMassageModeSelect(SleepIQMassageSelect):
+    """Wave-mode selection for one sleeper's side of the bed."""
+
     _attr_options = [mode.name.lower() for mode in Mode]
 
     def __init__(
@@ -227,17 +283,16 @@ class SleepIQMassageModeSelect(
         massage: SleepIQMassage,
     ) -> None:
         """Initialize the massage mode select."""
-        self.massage = massage
-        sleeper = sleeper_for_side(bed, massage.side)
-        super().__init__(coordinator, bed, sleeper, MASSAGE_MODE)
+        super().__init__(coordinator, bed, massage, MASSAGE_MODE)
 
     @property
     @override
     def extra_state_attributes(self) -> dict[str, Any]:
         """Expose the raw foundation/massage block for this side.
 
-        Diagnostic: lets the full field set be observed while the vendor app
-        drives the bed, which is how the pattern behaviour is being worked out.
+        Lets the full field set be observed live while the vendor app drives
+        the bed, which is how the pattern behaviour is being worked out. The
+        same block is in the diagnostics download as a snapshot.
         """
         return dict(self.massage.raw)
 
@@ -255,18 +310,15 @@ class SleepIQMassageModeSelect(
         treats mode and speed as mutually exclusive, so the speed entities will
         follow to off on the next refresh.
         """
-        await self.massage.set_mode(Mode[option.upper()])
+        await self._async_write(self.massage.set_mode(Mode[option.upper()]))
         self._attr_current_option = option
         await self.coordinator.async_request_refresh()
         self.async_write_ha_state()
 
 
-class SleepIQMassageSpeedSelect(
-    SleepIQSleeperEntity[SleepIQDataUpdateCoordinator], SelectEntity
-):
+class SleepIQMassageSpeedSelect(SleepIQMassageSelect):
     """Motor speed for the head or foot motor on one sleeper's side."""
 
-    _attr_icon = "mdi:vibrate"
     _attr_options = [speed.name.lower() for speed in Speed]
 
     def __init__(
@@ -278,11 +330,8 @@ class SleepIQMassageSpeedSelect(
         key: str,
     ) -> None:
         """Initialize the massage speed select."""
-        self.massage = massage
         self.end = end
-        self._attr_translation_key = key
-        sleeper = sleeper_for_side(bed, massage.side)
-        super().__init__(coordinator, bed, sleeper, key)
+        super().__init__(coordinator, bed, massage, key)
 
     @property
     def _speed(self) -> Speed:
@@ -305,9 +354,10 @@ class SleepIQMassageSpeedSelect(
         """
         speed = Speed[option.upper()]
         if self.end == "foot":
-            await self.massage.set_speeds(foot_speed=speed)
+            request = self.massage.set_speeds(foot_speed=speed)
         else:
-            await self.massage.set_speeds(head_speed=speed)
+            request = self.massage.set_speeds(head_speed=speed)
+        await self._async_write(request)
         self._attr_current_option = option
         await self.coordinator.async_request_refresh()
         self.async_write_ha_state()

@@ -8,10 +8,13 @@ from asyncsleepiq import (
     CoreTemps,
     FootWarmingTemps,
     SleepIQActuator,
+    SleepIQAPIException,
     SleepIQBed,
     SleepIQCoreClimate,
     SleepIQFootWarmer,
+    SleepIQLoginException,
     SleepIQSleeper,
+    SleepIQTimeoutException,
 )
 
 from homeassistant.components.number import (
@@ -21,11 +24,13 @@ from homeassistant.components.number import (
 )
 from homeassistant.const import UnitOfTime
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
     ACTUATOR,
     CORE_CLIMATE_TIMER,
+    DOMAIN,
     ENTITY_TYPES,
     FIRMNESS,
     FOOT_WARMING_TIMER,
@@ -34,7 +39,16 @@ from .const import (
 )
 from .coordinator import SleepIQConfigEntry, SleepIQDataUpdateCoordinator
 from .entity import SleepIQBedEntity, sleeper_for_side
-from .massage import MASSAGE_TIMER_MAX, MASSAGE_TIMER_MIN, SleepIQMassage
+from .massage import (
+    MASSAGE_TIMER_MAX,
+    MASSAGE_TIMER_MIN,
+    SleepIQMassage,
+    massage_label,
+)
+
+# Every number writes to the bed; the cloud API is happiest with one request
+# in flight per account.
+PARALLEL_UPDATES = 1
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -92,20 +106,6 @@ async def _async_set_foot_warmer_time(
         await foot_warmer.turn_on(temperature, time)
 
     foot_warmer.timer = time
-
-
-async def _async_set_massage_time(massage: SleepIQMassage, time: int) -> None:
-    await massage.set_timer(time)
-
-
-def _get_massage_timer_name(bed: SleepIQBed, massage: SleepIQMassage) -> str:
-    sleeper = sleeper_for_side(bed, massage.side)
-    return f"SleepNumber {bed.name} {sleeper.name} {ENTITY_TYPES[MASSAGE_TIMER]}"
-
-
-def _get_massage_timer_unique_id(bed: SleepIQBed, massage: SleepIQMassage) -> str:
-    sleeper = sleeper_for_side(bed, massage.side)
-    return f"{sleeper.sleeper_id}_{MASSAGE_TIMER}"
 
 
 def _get_foot_warming_name(bed: SleepIQBed, foot_warmer: SleepIQFootWarmer) -> str:
@@ -177,20 +177,6 @@ NUMBER_DESCRIPTIONS: dict[str, SleepIQNumberEntityDescription] = {
         native_unit_of_measurement=UnitOfTime.MINUTES,
         device_class=NumberDeviceClass.DURATION,
     ),
-    MASSAGE_TIMER: SleepIQNumberEntityDescription(
-        key=MASSAGE_TIMER,
-        native_min_value=MASSAGE_TIMER_MIN,
-        native_max_value=MASSAGE_TIMER_MAX,
-        native_step=1,
-        name=ENTITY_TYPES[MASSAGE_TIMER],
-        icon="mdi:timer-vibrate",
-        value_fn=lambda massage: massage.timer,
-        set_value_fn=_async_set_massage_time,
-        get_name_fn=_get_massage_timer_name,
-        get_unique_id_fn=_get_massage_timer_unique_id,
-        native_unit_of_measurement=UnitOfTime.MINUTES,
-        device_class=NumberDeviceClass.DURATION,
-    ),
     CORE_CLIMATE_TIMER: SleepIQNumberEntityDescription(
         key=CORE_CLIMATE_TIMER,
         native_min_value=0,
@@ -216,7 +202,7 @@ async def async_setup_entry(
     """Set up the SleepIQ bed sensors."""
     data = entry.runtime_data
 
-    entities: list[SleepIQNumberEntity] = []
+    entities: list[SleepIQBedEntity[SleepIQDataUpdateCoordinator]] = []
     for bed in data.client.beds.values():
         entities.extend(
             SleepIQNumberEntity(
@@ -255,13 +241,8 @@ async def async_setup_entry(
             for core_climate in bed.foundation.core_climates
         )
         entities.extend(
-            SleepIQNumberEntity(
-                data.data_coordinator,
-                bed,
-                massage,
-                NUMBER_DESCRIPTIONS[MASSAGE_TIMER],
-            )
-            for massage in getattr(bed.foundation, "massage_sides", [])
+            SleepIQMassageTimerNumber(data.data_coordinator, bed, massage)
+            for massage in data.massage_sides.get(bed.id, [])
         )
 
     async_add_entities(entities)
@@ -302,4 +283,72 @@ class SleepIQNumberEntity(SleepIQBedEntity[SleepIQDataUpdateCoordinator], Number
         """Set the number value."""
         await self.entity_description.set_value_fn(self.device, int(value))
         self._attr_native_value = value
+        self.async_write_ha_state()
+
+
+class SleepIQMassageTimerNumber(
+    SleepIQBedEntity[SleepIQDataUpdateCoordinator], NumberEntity
+):
+    """Massage timer, in minutes, for one side of the bed.
+
+    An armed countdown rather than a stored preference: the bed drops it if a
+    massage does not start, and counts it down while one runs. Named by the
+    sleeper on that side and keyed on the physical side, like the massage
+    selects.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = MASSAGE_TIMER
+    _attr_native_min_value = MASSAGE_TIMER_MIN
+    _attr_native_max_value = MASSAGE_TIMER_MAX
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_device_class = NumberDeviceClass.DURATION
+
+    def __init__(
+        self,
+        coordinator: SleepIQDataUpdateCoordinator,
+        bed: SleepIQBed,
+        massage: SleepIQMassage,
+    ) -> None:
+        """Initialize the massage timer."""
+        self.massage = massage
+        self._attr_translation_placeholders = {
+            "sleeper": massage_label(bed, massage.side)
+        }
+        self._attr_unique_id = f"{bed.id}_{massage.side.value}_{MASSAGE_TIMER}"
+        super().__init__(coordinator, bed)
+
+    @property
+    @override
+    def icon(self) -> None:
+        """No entity icon: icons.json supplies one through the translation key.
+
+        The bed base class sets _attr_icon to mdi:bed for every coordinator
+        entity, which would otherwise override the translated icon.
+        """
+        return None
+
+    @callback
+    @override
+    def _async_update_attrs(self) -> None:
+        """Update number attributes."""
+        self._attr_native_value = float(self.massage.timer)
+
+    @override
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the timer, translating a refusal for the user."""
+        try:
+            await self.massage.set_timer(int(value))
+        except (
+            SleepIQAPIException,
+            SleepIQLoginException,
+            SleepIQTimeoutException,
+        ) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="massage_write_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+        self._attr_native_value = float(self.massage.timer)
         self.async_write_ha_state()
