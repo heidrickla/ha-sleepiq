@@ -1,6 +1,6 @@
 name: Validate
 
-# Runs on the self-hosted act_runner on a self-hosted runner, not GitHub-hosted runners -
+# Runs on a self-hosted act_runner, not GitHub-hosted runners -
 # GitHub Actions minutes are a budget line and this hardware is already paid for.
 #
 # THE RUNNER IS SHARED AND ITS CAPACITY IS 1. Other agent sessions queue behind
