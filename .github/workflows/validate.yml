@@ -22,3 +22,6 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
+          # This shadows core's sleepiq, whose brand assets live in the core
+          # half of home-assistant/brands. HACS only checks the custom half.
+          ignore: brands
