@@ -12,3 +12,9 @@ Thumbs.db
 
 # Local Claude orientation doc - keep out of the repo
 CLAUDE.md
+
+# Agent session config and hooks - machine-specific, never part of the project
+.claude/
+
+# Private operational notes (internal hosts, accounts, lab setup)
+docs/local/
