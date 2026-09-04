@@ -1,0 +1,41 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# Gitea's act_runner also picks up .github/workflows, so every job here is
+# gated to GitHub. On the gitea forge these skip instantly and
+# .gitea/workflows/validate.yml is the one that runs.
+
+jobs:
+  tests:
+    if: github.server_url == 'https://github.com'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Home Assistant 2026.x needs Python 3.14.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      # 0.13.357 pins Home Assistant 2026.8.3; it brings pytest, its asyncio
+      # and aiohttp plugins, pytest-cov, PyYAML and Pillow with it (pinning
+      # those again here makes pip's resolution impossible). asyncsleepiq is
+      # the integration's own requirement, which the harness does not install.
+      - run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install "mypy==1.18.2" "ruff==0.15.21" \
+            "asyncsleepiq==1.7.1" \
+            "pytest-homeassistant-custom-component==0.13.357"
+      - run: .venv/bin/ruff check .
+      - run: .venv/bin/ruff format --check .
+      # pyproject already sets -q; a second one here would hide the summary
+      # line, which is the evidence a CI log is read for.
+      - run: .venv/bin/python -m pytest tests/test_massage.py -p no:homeassistant
+      # Coverage is reported, not gated: the 95% fail-under lands once the
+      # uncovered branches have tests.
+      - run: .venv/bin/python -m pytest tests/ha --cov=custom_components/sleepiq --cov-report=term-missing
+      - run: .venv/bin/python -m mypy custom_components/sleepiq
+      - run: .venv/bin/python tools/validate_local.py

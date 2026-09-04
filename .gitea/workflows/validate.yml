@@ -6,7 +6,9 @@ name: Validate
 # THE RUNNER IS SHARED AND ITS CAPACITY IS 1. Other agent sessions queue behind
 # anything pushed here, so the per-push job is deliberately ONE fast job. The
 # slow Home Assistant actions are workflow_dispatch only - available on demand,
-# never occupying the shared runner on every commit.
+# never occupying the shared runner on every commit. The Home Assistant test
+# harness, mypy and the offline validator run in the GitHub Tests workflow,
+# which is gated to GitHub and skips here.
 # (Capacity >1 was tried on 2026-08-25 and act_runner v0.6.1 corrupted job
 # contexts - un-interpolated matrix vars and cross-job workspace lstat - so 1 is
 # the known-good setting. Do not raise it to make this faster.)
@@ -35,38 +37,42 @@ jobs:
       - name: Ruff
         # ruff.toml adopts Home Assistant core's isort settings, because this
         # repo vendors core's files and must not reformat them.
-        run: python3 -m ruff check custom_components/
+        run: |
+          python3 -m ruff check .
+          python3 -m ruff format --check .
 
       - name: Vendored core files are unmodified
         # The point of the baseline: an upstream resync stays a small diff only
         # while the untouched files stay byte-identical. Reformatting one - by
         # ruff --fix, an editor, or a well-meaning cleanup - silently destroys
-        # that, and nothing else would notice.
+        # that, and nothing else would notice. A line ending in `modified` in
+        # the baseline is a file this project edits on purpose; NOTICE says how.
         run: |
           python3 - <<'PY'
           import hashlib, io, os, re, sys
-          base = {}
+          base, owned = {}, set()
           for line in io.open("docs/UPSTREAM-BASELINE.txt", encoding="utf-8"):
-              m = re.match(r"\s*([0-9a-f]{64})\s+\*?(\S+)", line)
-              if m: base[m.group(2)] = m.group(1)
-          # Files this project deliberately modifies. Everything else in the
-          # baseline must still match upstream exactly.
-          OWNED = {"__init__.py","const.py","coordinator.py","number.py",
-                   "select.py","icons.json","manifest.json","strings.json"}
+              m = re.match(r"\s*([0-9a-f]{64})\s+\*?(\S+)(\s+modified)?\s*$", line)
+              if not m: continue
+              base[m.group(2)] = m.group(1)
+              if m.group(3): owned.add(m.group(2))
+          notice = io.open("NOTICE", encoding="utf-8").read()
           bad = []
           for name, want in sorted(base.items()):
-              if name in OWNED: continue
               p = os.path.join("custom_components/sleepiq", name)
               if not os.path.exists(p):
                   bad.append(f"{name}: MISSING"); continue
               got = hashlib.sha256(open(p, "rb").read()).hexdigest()
-              if got != want:
+              if name in owned:
+                  if got == want: bad.append(f"{name}: marked modified but identical to upstream")
+                  if name not in notice: bad.append(f"{name}: modified but not described in NOTICE")
+              elif got != want:
                   bad.append(f"{name}: drifted from upstream 2026.8.2")
           if bad:
-              print("Vendored core files must stay byte-identical:")
+              print("Vendored core files must stay byte-identical unless marked modified:")
               for b in bad: print("  -", b)
               sys.exit(1)
-          print(f"{len(base)-len(OWNED)} vendored file(s) match upstream")
+          print(f"{len(base)-len(owned)} vendored file(s) match upstream, {len(owned)} modified on purpose")
           PY
 
       # NOTE: there is deliberately no separate ast.parse step.
@@ -76,10 +82,12 @@ jobs:
       # parse them. Ruff already parses every file at target-version py313 per
       # ruff.toml, so the check was both redundant and running under the wrong
       # interpreter. Do not reintroduce it without pinning a 3.13 toolchain.
+      # tools/validate_local.py has the same constraint and runs in the GitHub
+      # Tests job on Python 3.14.
 
       - name: JSON is valid
         run: |
-          for f in custom_components/sleepiq/*.json hacs.json; do
+          for f in custom_components/sleepiq/*.json custom_components/sleepiq/translations/*.json hacs.json; do
             python3 -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "$f" || exit 1
           done
           echo "all JSON valid"
@@ -95,18 +103,47 @@ jobs:
           # A custom integration without a version silently fails to load - the
           # symptom is a missing integration, not an error.
           assert m["version"], "version is required for a custom integration"
+          assert "quality_scale" not in m, "the badge is core-only"
           print("manifest ok:", m["domain"], m["version"])
           PY
 
-      - name: No core-only translation refs
-        # strings.json in core uses [%key:common::...] refs that resolve only
-        # inside core's build; in a custom component they render as raw keys.
+      - name: Translations ship and agree
+        # Home Assistant reads translations/<lang>.json at runtime; strings.json
+        # is only hassfest's input. Core's [%key:common::...] references resolve
+        # only inside core's build and render as raw keys here.
         run: |
-          if grep -q '%key:' custom_components/sleepiq/strings.json; then
-            echo "core-only [%key:...] reference found - replace with a literal"
-            exit 1
-          fi
-          echo "no core-only refs"
+          python3 - <<'PY'
+          import json
+          s = json.load(open("custom_components/sleepiq/strings.json", encoding="utf-8"))
+          e = json.load(open("custom_components/sleepiq/translations/en.json", encoding="utf-8"))
+          assert s == e, "strings.json and translations/en.json differ - copy strings.json over"
+          for name in ("strings.json", "translations/en.json"):
+              assert "%key:" not in open(f"custom_components/sleepiq/{name}", encoding="utf-8").read(), f"{name}: core-only [%key:...] reference"
+          print("translations ok")
+          PY
+
+      - name: Quality scale is complete and honest
+        run: |
+          python3 -m pip install --quiet "PyYAML==6.0.2"
+          python3 - <<'PY'
+          import json, yaml
+          rules = yaml.safe_load(open(
+              "custom_components/sleepiq/quality_scale.yaml", encoding="utf-8"))["rules"]
+          todo = sorted(k for k, v in rules.items()
+                        if isinstance(v, dict) and v.get("status") == "todo")
+          for name, v in rules.items():
+              if isinstance(v, dict):
+                  assert v.get("status") in {"done","todo","exempt"}, name
+                  if v.get("status") != "done":
+                      assert str(v.get("comment","")).strip(), f"{name}: needs a reason"
+              else:
+                  assert v == "done", name
+          claimed = json.load(open(
+              "custom_components/sleepiq/manifest.json", encoding="utf-8")
+          ).get("quality_scale")
+          assert not (claimed and todo), f"manifest claims {claimed} with todo: {todo}"
+          print(f"{len(rules)} rules; still todo: {', '.join(todo) or 'none'}")
+          PY
 
   # Slow, and depend on fetching third-party actions. Manual only, so they never
   # hold the shared single-capacity runner on an ordinary push.
@@ -117,8 +154,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: home-assistant/actions/hassfest@master
-        continue-on-error: true
       - uses: hacs/action@main
-        continue-on-error: true
         with:
           category: integration
+          # This shadows core's sleepiq, whose brand assets live in the core
+          # half of home-assistant/brands. HACS only checks the custom half.
+          ignore: brands
