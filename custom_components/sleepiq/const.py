@@ -40,10 +40,6 @@ ENTITY_TYPES = {
     HEART_RATE: "Heart Rate Average",
     RESPIRATORY_RATE: "Respiratory Rate Average",
     HRV: "Heart Rate Variability",
-    MASSAGE_MODE: "Massage Mode",
-    MASSAGE_FOOT_SPEED: "Foot Massage Speed",
-    MASSAGE_HEAD_SPEED: "Head Massage Speed",
-    MASSAGE_TIMER: "Massage Timer",
 }
 
 LEFT = "left"

@@ -1,19 +1,27 @@
 """Coordinator for SleepIQ."""
 
 import asyncio
+from collections.abc import Coroutine
 from dataclasses import dataclass
 from datetime import timedelta
 import logging
-from typing import override
+from typing import Any, override
 
-from asyncsleepiq import AsyncSleepIQ, SleepIQAPIException, SleepIQTimeoutException
+from asyncsleepiq import (
+    AsyncSleepIQ,
+    SleepIQAPIException,
+    SleepIQLoginException,
+    SleepIQTimeoutException,
+)
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_USERNAME
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .massage import update_massage
+from .const import DOMAIN
+from .massage import SleepIQMassage, update_massage
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,6 +30,31 @@ LONGER_UPDATE_INTERVAL = timedelta(minutes=5)
 SLEEP_DATA_UPDATE_INTERVAL = timedelta(hours=1)  # Sleep data doesn't change frequently
 
 type SleepIQConfigEntry = ConfigEntry[SleepIQData]
+
+
+async def _gather(tasks: list[Coroutine[Any, Any, None]]) -> None:
+    """Run the fetches together and turn library failures into coordinator ones.
+
+    The library re-logs in on a 401 and raises SleepIQLoginException when the
+    stored password no longer works. Left uncaught that logs a traceback every
+    poll; raised as ConfigEntryAuthFailed it starts the reauth flow instead.
+    """
+    try:
+        await asyncio.gather(*tasks)
+    except SleepIQLoginException as err:
+        raise ConfigEntryAuthFailed(
+            translation_domain=DOMAIN, translation_key="invalid_auth"
+        ) from err
+    except SleepIQTimeoutException as err:
+        raise UpdateFailed(
+            translation_domain=DOMAIN, translation_key="update_timeout"
+        ) from err
+    except SleepIQAPIException as err:
+        raise UpdateFailed(
+            translation_domain=DOMAIN,
+            translation_key="update_failed",
+            translation_placeholders={"error": str(err)},
+        ) from err
 
 
 class SleepIQDataUpdateCoordinator(DataUpdateCoordinator[None]):
@@ -34,6 +67,7 @@ class SleepIQDataUpdateCoordinator(DataUpdateCoordinator[None]):
         hass: HomeAssistant,
         config_entry: SleepIQConfigEntry,
         client: AsyncSleepIQ,
+        massage_sides: dict[str, list[SleepIQMassage]],
     ) -> None:
         """Initialize coordinator."""
         super().__init__(
@@ -44,25 +78,22 @@ class SleepIQDataUpdateCoordinator(DataUpdateCoordinator[None]):
             update_interval=UPDATE_INTERVAL,
         )
         self.client = client
+        self.massage_sides = massage_sides
 
     @override
     async def _async_update_data(self) -> None:
-        tasks = (
-            [self.client.fetch_bed_statuses()]
-            + [
-                bed.foundation.update_foundation_status()
-                for bed in self.client.beds.values()
-            ]
-            # Massage state is not part of update_foundation_status(); the
-            # library never reads it. One GET per bed covers both sides.
-            + [update_massage(bed) for bed in self.client.beds.values()]
+        tasks: list[Coroutine[Any, Any, None]] = [self.client.fetch_bed_statuses()]
+        tasks.extend(
+            bed.foundation.update_foundation_status()
+            for bed in self.client.beds.values()
         )
-        try:
-            await asyncio.gather(*tasks)
-        except SleepIQTimeoutException as err:
-            raise UpdateFailed(f"Timed out fetching SleepIQ data: {err}") from err
-        except SleepIQAPIException as err:
-            raise UpdateFailed(f"Failed to fetch SleepIQ data: {err}") from err
+        # Massage state is not part of update_foundation_status(); the
+        # library never reads it. One GET per bed covers both sides.
+        tasks.extend(
+            update_massage(self.client, bed_id, sides)
+            for bed_id, sides in self.massage_sides.items()
+        )
+        await _gather(tasks)
 
 
 class SleepIQPauseUpdateCoordinator(DataUpdateCoordinator[None]):
@@ -88,14 +119,7 @@ class SleepIQPauseUpdateCoordinator(DataUpdateCoordinator[None]):
 
     @override
     async def _async_update_data(self) -> None:
-        try:
-            await asyncio.gather(
-                *[bed.fetch_pause_mode() for bed in self.client.beds.values()]
-            )
-        except SleepIQTimeoutException as err:
-            raise UpdateFailed(f"Timed out fetching SleepIQ pause data: {err}") from err
-        except SleepIQAPIException as err:
-            raise UpdateFailed(f"Failed to fetch SleepIQ pause data: {err}") from err
+        await _gather([bed.fetch_pause_mode() for bed in self.client.beds.values()])
 
 
 class SleepIQSleepDataCoordinator(DataUpdateCoordinator[None]):
@@ -122,18 +146,13 @@ class SleepIQSleepDataCoordinator(DataUpdateCoordinator[None]):
     @override
     async def _async_update_data(self) -> None:
         """Fetch sleep health data from API via asyncsleepiq library."""
-        try:
-            await asyncio.gather(
-                *[
-                    sleeper.fetch_sleep_data()
-                    for bed in self.client.beds.values()
-                    for sleeper in bed.sleepers
-                ]
-            )
-        except SleepIQTimeoutException as err:
-            raise UpdateFailed(f"Timed out fetching SleepIQ sleep data: {err}") from err
-        except SleepIQAPIException as err:
-            raise UpdateFailed(f"Failed to fetch SleepIQ sleep data: {err}") from err
+        await _gather(
+            [
+                sleeper.fetch_sleep_data()
+                for bed in self.client.beds.values()
+                for sleeper in bed.sleepers
+            ]
+        )
 
 
 @dataclass
@@ -144,3 +163,5 @@ class SleepIQData:
     pause_coordinator: SleepIQPauseUpdateCoordinator
     sleep_data_coordinator: SleepIQSleepDataCoordinator
     client: AsyncSleepIQ
+    # Massage objects per bed id; empty for a bed without the massage board.
+    massage_sides: dict[str, list[SleepIQMassage]]

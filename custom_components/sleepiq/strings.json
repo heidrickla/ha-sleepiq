@@ -13,6 +13,9 @@
         "data": {
           "password": "Password"
         },
+        "data_description": {
+          "password": "The current password of the SleepIQ account {username}."
+        },
         "description": "The SleepIQ integration needs to re-authenticate your account {username}.",
         "title": "Reauthenticate integration"
       },
@@ -20,11 +23,21 @@
         "data": {
           "password": "Password",
           "username": "Username"
-        }
+        },
+        "data_description": {
+          "password": "The password you sign in to the SleepIQ app with.",
+          "username": "The email address you sign in to the SleepIQ app with. One entry covers every bed on the account."
+        },
+        "description": "Sign in with your SleepIQ account. Home Assistant reads the beds from the SleepNumber cloud, so nothing on your network needs configuring."
       }
     }
   },
   "entity": {
+    "number": {
+      "massage_timer": {
+        "name": "{sleeper} massage timer"
+      }
+    },
     "select": {
       "core_temps": {
         "state": {
@@ -46,6 +59,7 @@
         }
       },
       "massage_mode": {
+        "name": "{sleeper} massage mode",
         "state": {
           "off": "Off",
           "soothe": "Smooth",
@@ -54,6 +68,7 @@
         }
       },
       "massage_foot_speed": {
+        "name": "{sleeper} foot massage speed",
         "state": {
           "off": "Off",
           "low": "Low",
@@ -62,6 +77,7 @@
         }
       },
       "massage_head_speed": {
+        "name": "{sleeper} head massage speed",
         "state": {
           "off": "Off",
           "low": "Low",
@@ -69,6 +85,29 @@
           "high": "High"
         }
       }
+    }
+  },
+  "exceptions": {
+    "init_failed": {
+      "message": "SleepIQ returned an error while reading the beds on the account: {error}"
+    },
+    "init_timeout": {
+      "message": "Timed out reading the beds from SleepIQ."
+    },
+    "invalid_auth": {
+      "message": "SleepIQ rejected the stored username and password."
+    },
+    "login_timeout": {
+      "message": "Timed out signing in to SleepIQ."
+    },
+    "massage_write_failed": {
+      "message": "The bed did not accept the massage change: {error}"
+    },
+    "update_failed": {
+      "message": "SleepIQ returned an error while fetching bed data: {error}"
+    },
+    "update_timeout": {
+      "message": "Timed out fetching bed data from SleepIQ."
     }
   }
 }

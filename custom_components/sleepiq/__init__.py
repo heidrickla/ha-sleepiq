@@ -19,7 +19,15 @@ from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.typing import ConfigType
 
-from .const import DOMAIN, IS_IN_BED, SLEEP_NUMBER
+from .const import (
+    DOMAIN,
+    IS_IN_BED,
+    MASSAGE_FOOT_SPEED,
+    MASSAGE_HEAD_SPEED,
+    MASSAGE_MODE,
+    MASSAGE_TIMER,
+    SLEEP_NUMBER,
+)
 from .coordinator import (
     SleepIQConfigEntry,
     SleepIQData,
@@ -78,30 +86,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: SleepIQConfigEntry) -> b
         await gateway.login(email, password)
     except SleepIQLoginException as err:
         _LOGGER.error("Could not authenticate with SleepIQ server")
-        raise ConfigEntryAuthFailed(err) from err
+        raise ConfigEntryAuthFailed(
+            translation_domain=DOMAIN, translation_key="invalid_auth"
+        ) from err
     except SleepIQTimeoutException as err:
         raise ConfigEntryNotReady(
-            str(err) or "Timed out during authentication"
+            translation_domain=DOMAIN, translation_key="login_timeout"
         ) from err
 
     try:
         await gateway.init_beds()
     except SleepIQTimeoutException as err:
         raise ConfigEntryNotReady(
-            str(err) or "Timed out during initialization"
+            translation_domain=DOMAIN, translation_key="init_timeout"
         ) from err
     except SleepIQAPIException as err:
-        raise ConfigEntryNotReady(str(err) or "Error reading from SleepIQ API") from err
+        raise ConfigEntryNotReady(
+            translation_domain=DOMAIN,
+            translation_key="init_failed",
+            translation_placeholders={"error": str(err)},
+        ) from err
 
-    # asyncsleepiq has no massage object, so attach ours to each foundation
-    # before any coordinator refresh runs. Beds without the massage board
-    # get an empty list and therefore no entities.
-    for bed in gateway.beds.values():
-        bed.foundation.massage_sides = build_massage_sides(bed)
+    # asyncsleepiq has no massage object, so build ours per bed before any
+    # coordinator refresh runs. Beds without the massage board get an empty
+    # list and therefore no entities.
+    massage_sides = {
+        bed.id: build_massage_sides(gateway, bed) for bed in gateway.beds.values()
+    }
 
     await _async_migrate_unique_ids(hass, entry, gateway)
+    await _async_migrate_massage_unique_ids(hass, entry, gateway)
 
-    coordinator = SleepIQDataUpdateCoordinator(hass, entry, gateway)
+    coordinator = SleepIQDataUpdateCoordinator(hass, entry, gateway, massage_sides)
     pause_coordinator = SleepIQPauseUpdateCoordinator(hass, entry, gateway)
     sleep_data_coordinator = SleepIQSleepDataCoordinator(hass, entry, gateway)
 
@@ -115,6 +131,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SleepIQConfigEntry) -> b
         pause_coordinator=pause_coordinator,
         sleep_data_coordinator=sleep_data_coordinator,
         client=gateway,
+        massage_sides=massage_sides,
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -168,5 +185,46 @@ async def _async_migrate_unique_ids(
             new_unique_id,
         )
         return {"new_unique_id": new_unique_id}
+
+    await er.async_migrate_entries(hass, entry.entry_id, _async_migrator)
+
+
+async def _async_migrate_massage_unique_ids(
+    hass: HomeAssistant, entry: ConfigEntry, gateway: AsyncSleepIQ
+) -> None:
+    """Move massage entities from sleeper-keyed to side-keyed unique ids.
+
+    The first release keyed them {sleeper_id}_{type}, which collides on a bed
+    with one sleeper because both sides resolved to that sleeper. They are now
+    {bed_id}_{side}_{type}, like core's foot warmer and core climate entities.
+    """
+    massage_types = (
+        MASSAGE_MODE,
+        MASSAGE_FOOT_SPEED,
+        MASSAGE_HEAD_SPEED,
+        MASSAGE_TIMER,
+    )
+    sleeper_sides = {
+        sleeper.sleeper_id: (bed.id, sleeper.side.value)
+        for bed in gateway.beds.values()
+        for sleeper in bed.sleepers
+    }
+
+    @callback
+    def _async_migrator(entity_entry: er.RegistryEntry) -> dict[str, Any] | None:
+        old_unique_id = entity_entry.unique_id
+        for massage_type in massage_types:
+            if not old_unique_id.endswith(f"_{massage_type}"):
+                continue
+            sleeper_id = old_unique_id.removesuffix(f"_{massage_type}")
+            if (found := sleeper_sides.get(sleeper_id)) is None:
+                return None
+            bed_id, side = found
+            new_unique_id = f"{bed_id}_{side}_{massage_type}"
+            _LOGGER.debug(
+                "Migrating unique_id from [%s] to [%s]", old_unique_id, new_unique_id
+            )
+            return {"new_unique_id": new_unique_id}
+        return None
 
     await er.async_migrate_entries(hass, entry.entry_id, _async_migrator)

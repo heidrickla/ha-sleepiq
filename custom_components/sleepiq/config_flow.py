@@ -11,10 +11,21 @@ from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+# A password field the frontend masks, with no default and no suggested value,
+# so a rejected attempt never echoes what was typed back into the form.
+PASSWORD_SELECTOR = TextSelector(
+    TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="current-password")
+)
 
 
 class SleepIQFlowHandler(ConfigFlow, domain=DOMAIN):
@@ -68,7 +79,7 @@ class SleepIQFlowHandler(ConfigFlow, domain=DOMAIN):
                         CONF_USERNAME,
                         default=user_input.get(CONF_USERNAME),
                     ): str,
-                    vol.Required(CONF_PASSWORD): str,
+                    vol.Required(CONF_PASSWORD): PASSWORD_SELECTOR,
                 }
             ),
             errors=errors,
@@ -100,7 +111,7 @@ class SleepIQFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
+            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): PASSWORD_SELECTOR}),
             errors=errors,
             description_placeholders={
                 CONF_USERNAME: reauth_entry.data[CONF_USERNAME],

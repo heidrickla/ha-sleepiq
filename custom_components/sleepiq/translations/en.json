@@ -1,0 +1,113 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Account is already configured",
+      "reauth_successful": "Re-authentication was successful"
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication"
+    },
+    "step": {
+      "reauth_confirm": {
+        "data": {
+          "password": "Password"
+        },
+        "data_description": {
+          "password": "The current password of the SleepIQ account {username}."
+        },
+        "description": "The SleepIQ integration needs to re-authenticate your account {username}.",
+        "title": "Reauthenticate integration"
+      },
+      "user": {
+        "data": {
+          "password": "Password",
+          "username": "Username"
+        },
+        "data_description": {
+          "password": "The password you sign in to the SleepIQ app with.",
+          "username": "The email address you sign in to the SleepIQ app with. One entry covers every bed on the account."
+        },
+        "description": "Sign in with your SleepIQ account. Home Assistant reads the beds from the SleepNumber cloud, so nothing on your network needs configuring."
+      }
+    }
+  },
+  "entity": {
+    "number": {
+      "massage_timer": {
+        "name": "{sleeper} massage timer"
+      }
+    },
+    "select": {
+      "core_temps": {
+        "state": {
+          "cooling_high": "Cooling high",
+          "cooling_low": "Cooling low",
+          "cooling_medium": "Cooling medium",
+          "heating_high": "Heating high",
+          "heating_low": "Heating low",
+          "heating_medium": "Heating medium",
+          "off": "Off"
+        }
+      },
+      "foot_warmer_temp": {
+        "state": {
+          "high": "High",
+          "low": "Low",
+          "medium": "Medium",
+          "off": "Off"
+        }
+      },
+      "massage_mode": {
+        "name": "{sleeper} massage mode",
+        "state": {
+          "off": "Off",
+          "soothe": "Smooth",
+          "revitilize": "Revitalize",
+          "wave": "Wave"
+        }
+      },
+      "massage_foot_speed": {
+        "name": "{sleeper} foot massage speed",
+        "state": {
+          "off": "Off",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      },
+      "massage_head_speed": {
+        "name": "{sleeper} head massage speed",
+        "state": {
+          "off": "Off",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "init_failed": {
+      "message": "SleepIQ returned an error while reading the beds on the account: {error}"
+    },
+    "init_timeout": {
+      "message": "Timed out reading the beds from SleepIQ."
+    },
+    "invalid_auth": {
+      "message": "SleepIQ rejected the stored username and password."
+    },
+    "login_timeout": {
+      "message": "Timed out signing in to SleepIQ."
+    },
+    "massage_write_failed": {
+      "message": "The bed did not accept the massage change: {error}"
+    },
+    "update_failed": {
+      "message": "SleepIQ returned an error while fetching bed data: {error}"
+    },
+    "update_timeout": {
+      "message": "Timed out fetching bed data from SleepIQ."
+    }
+  }
+}

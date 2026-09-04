@@ -1,5 +1,10 @@
 {
   "entity": {
+    "number": {
+      "massage_timer": {
+        "default": "mdi:timer-vibrate"
+      }
+    },
     "sensor": {
       "heart_rate_avg": {
         "default": "mdi:heart-pulse"
