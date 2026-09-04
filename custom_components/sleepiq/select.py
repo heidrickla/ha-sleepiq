@@ -52,7 +52,9 @@ async def async_setup_entry(
             for core_climate in bed.foundation.core_climates
         )
         for massage in getattr(bed.foundation, "massage_sides", []):
-            entities.append(SleepIQMassageModeSelect(data.data_coordinator, bed, massage))
+            entities.append(
+                SleepIQMassageModeSelect(data.data_coordinator, bed, massage)
+            )
             entities.append(
                 SleepIQMassageSpeedSelect(
                     data.data_coordinator, bed, massage, "foot", MASSAGE_FOOT_SPEED

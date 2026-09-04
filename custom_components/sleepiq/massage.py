@@ -50,7 +50,9 @@ MASSAGE_TIMER_MAX = 60
 MASSAGE_DEFAULT_TIMER = 60
 
 
-def _coerce[_EnumT: (Speed, Mode)](enum_cls: type[_EnumT], raw: Any, default: _EnumT) -> _EnumT:
+def _coerce[_EnumT: (Speed, Mode)](
+    enum_cls: type[_EnumT], raw: Any, default: _EnumT
+) -> _EnumT:
     """Convert an API integer to an enum member, tolerating junk.
 
     The bed has been observed returning values outside the documented range;
@@ -91,8 +93,10 @@ class SleepIQMassage:
     @property
     def is_running(self) -> bool:
         """Return True if any massage motor is active."""
-        return bool(self.motor_status) or self.mode != Mode.OFF or bool(
-            self.foot_speed or self.head_speed
+        return (
+            bool(self.motor_status)
+            or self.mode != Mode.OFF
+            or bool(self.foot_speed or self.head_speed)
         )
 
     def apply(self, payload: dict[str, Any]) -> None:
@@ -186,7 +190,9 @@ def build_massage_sides(bed: SleepIQBed) -> list[SleepIQMassage]:
     if not foundation.features.get("hasMassageAndLight"):
         return []
 
-    return [SleepIQMassage(foundation, bed.id, side) for side in (Side.LEFT, Side.RIGHT)]
+    return [
+        SleepIQMassage(foundation, bed.id, side) for side in (Side.LEFT, Side.RIGHT)
+    ]
 
 
 async def update_massage(bed: SleepIQBed) -> None:
