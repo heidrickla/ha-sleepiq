@@ -1,10 +1,11 @@
 """Support for SleepIQ sensors."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import override
 
-from asyncsleepiq import SleepIQBed, SleepIQSleeper
+from asyncsleepiq.bed import SleepIQBed
+from asyncsleepiq.sleeper import SleepIQSleeper
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -12,14 +13,18 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import PRESSURE, UnitOfTime
+from homeassistant.const import UnitOfTime
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
     HEART_RATE,
+    HEART_RATE_AVG,
     HRV,
+    PRESSURE,
     RESPIRATORY_RATE,
+    RESPIRATORY_RATE_AVG,
     SLEEP_DURATION,
     SLEEP_NUMBER,
     SLEEP_SCORE,
@@ -29,7 +34,11 @@ from .coordinator import (
     SleepIQDataUpdateCoordinator,
     SleepIQSleepDataCoordinator,
 )
-from .entity import SleepIQSleeperEntity
+from .entity import SleepIQSleeperEntity, async_add_beds
+
+# Read-only and coordinator-driven: the coordinators do the polling, so
+# nothing here needs limiting.
+PARALLEL_UPDATES = 0
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -42,13 +51,13 @@ class SleepIQSensorEntityDescription(SensorEntityDescription):
 BED_SENSORS: tuple[SleepIQSensorEntityDescription, ...] = (
     SleepIQSensorEntityDescription(
         key=PRESSURE,
-        translation_key="pressure",
+        translation_key=PRESSURE,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda sleeper: sleeper.pressure,
     ),
     SleepIQSensorEntityDescription(
         key=SLEEP_NUMBER,
-        translation_key="sleep_number",
+        translation_key=SLEEP_NUMBER,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda sleeper: sleeper.sleep_number,
     ),
@@ -57,7 +66,7 @@ BED_SENSORS: tuple[SleepIQSensorEntityDescription, ...] = (
 SLEEP_HEALTH_SENSORS: tuple[SleepIQSensorEntityDescription, ...] = (
     SleepIQSensorEntityDescription(
         key=SLEEP_SCORE,
-        translation_key="sleep_score",
+        translation_key=SLEEP_SCORE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="score",
         value_fn=lambda sleeper: (
@@ -66,7 +75,7 @@ SLEEP_HEALTH_SENSORS: tuple[SleepIQSensorEntityDescription, ...] = (
     ),
     SleepIQSensorEntityDescription(
         key=SLEEP_DURATION,
-        translation_key="sleep_duration",
+        translation_key=SLEEP_DURATION,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTime.HOURS,
@@ -79,7 +88,7 @@ SLEEP_HEALTH_SENSORS: tuple[SleepIQSensorEntityDescription, ...] = (
     ),
     SleepIQSensorEntityDescription(
         key=HEART_RATE,
-        translation_key="heart_rate_avg",
+        translation_key=HEART_RATE_AVG,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="bpm",
         value_fn=lambda sleeper: (
@@ -88,7 +97,7 @@ SLEEP_HEALTH_SENSORS: tuple[SleepIQSensorEntityDescription, ...] = (
     ),
     SleepIQSensorEntityDescription(
         key=RESPIRATORY_RATE,
-        translation_key="respiratory_rate_avg",
+        translation_key=RESPIRATORY_RATE_AVG,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="brpm",
         value_fn=lambda sleeper: (
@@ -97,7 +106,7 @@ SLEEP_HEALTH_SENSORS: tuple[SleepIQSensorEntityDescription, ...] = (
     ),
     SleepIQSensorEntityDescription(
         key=HRV,
-        translation_key="hrv",
+        translation_key=HRV,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTime.MILLISECONDS,
@@ -114,23 +123,20 @@ async def async_setup_entry(
     """Set up the SleepIQ bed sensors."""
     data = entry.runtime_data
 
-    entities: list[SensorEntity] = []
+    def build(bed: SleepIQBed) -> Sequence[Entity]:
+        entities: list[Entity] = [
+            SleepIQSensorEntity(data.data_coordinator, bed, sleeper, description)
+            for sleeper in bed.sleepers
+            for description in BED_SENSORS
+        ]
+        entities.extend(
+            SleepIQSensorEntity(data.sleep_data_coordinator, bed, sleeper, description)
+            for sleeper in bed.sleepers
+            for description in SLEEP_HEALTH_SENSORS
+        )
+        return entities
 
-    entities.extend(
-        SleepIQSensorEntity(data.data_coordinator, bed, sleeper, description)
-        for bed in data.client.beds.values()
-        for sleeper in bed.sleepers
-        for description in BED_SENSORS
-    )
-
-    entities.extend(
-        SleepIQSensorEntity(data.sleep_data_coordinator, bed, sleeper, description)
-        for bed in data.client.beds.values()
-        for sleeper in bed.sleepers
-        for description in SLEEP_HEALTH_SENSORS
-    )
-
-    async_add_entities(entities)
+    async_add_beds(entry, data.data_coordinator, async_add_entities, build)
 
 
 class SleepIQSensorEntity(

@@ -1,38 +1,45 @@
 """Support for SleepIQ buttons."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from asyncsleepiq import SleepIQBed
+from asyncsleepiq.bed import SleepIQBed
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import SleepIQConfigEntry
-from .entity import SleepIQEntity
+from .entity import SleepIQEntity, async_add_beds, async_write_to_bed
+
+# Both buttons write to the bed; the cloud API is happiest with one request in
+# flight per account.
+PARALLEL_UPDATES = 1
 
 
 @dataclass(frozen=True, kw_only=True)
 class SleepIQButtonEntityDescription(ButtonEntityDescription):
     """Class to describe a Button entity."""
 
-    press_action: Callable[[SleepIQBed], Any]
+    press_action: Callable[[SleepIQBed], Coroutine[Any, Any, None]]
 
 
 ENTITY_DESCRIPTIONS = [
     SleepIQButtonEntityDescription(
         key="calibrate",
-        name="Calibrate",
+        translation_key="calibrate",
+        # Re-baselining the pressure sensors sets the bed up rather than
+        # operating it.
+        entity_category=EntityCategory.CONFIG,
         press_action=lambda client: client.calibrate(),
-        icon="mdi:target",
     ),
     SleepIQButtonEntityDescription(
         key="stop-pump",
-        name="Stop Pump",
+        translation_key="stop_pump",
         press_action=lambda client: client.stop_pump(),
-        icon="mdi:stop",
     ),
 ]
 
@@ -45,11 +52,10 @@ async def async_setup_entry(
     """Set up the sleep number buttons."""
     data = entry.runtime_data
 
-    async_add_entities(
-        SleepNumberButton(bed, ed)
-        for bed in data.client.beds.values()
-        for ed in ENTITY_DESCRIPTIONS
-    )
+    def build(bed: SleepIQBed) -> Sequence[Entity]:
+        return [SleepNumberButton(bed, ed) for ed in ENTITY_DESCRIPTIONS]
+
+    async_add_beds(entry, data.data_coordinator, async_add_entities, build)
 
 
 class SleepNumberButton(SleepIQEntity, ButtonEntity):
@@ -62,11 +68,12 @@ class SleepNumberButton(SleepIQEntity, ButtonEntity):
     ) -> None:
         """Initialize the Button."""
         super().__init__(bed)
-        self._attr_name = f"SleepNumber {bed.name} {entity_description.name}"
         self._attr_unique_id = f"{bed.id}-{entity_description.key}"
         self.entity_description = entity_description
 
     @override
     async def async_press(self) -> None:
         """Press the button."""
-        await self.entity_description.press_action(self.bed)
+        await async_write_to_bed(
+            self.entity_description.press_action(self.bed), "write_failed"
+        )
