@@ -33,9 +33,10 @@ jobs:
       - run: .venv/bin/ruff format --check .
       # Two suites, one coverage total. The pure massage suite runs without
       # the Home Assistant plugin; the Home Assistant layer appends to its
-      # data, and the gate is checked once, over both. pyproject already sets
-      # -q; a second one here would hide the summary line, which is the
-      # evidence a CI log is read for.
+      # data, and the gate is checked once, over both. Neither run passes -q:
+      # the summary line is the evidence a CI log is read for. pytest is run as
+      # a module so pyproject's `-p tests.winposix` resolves; that plugin only
+      # does anything on Windows.
       - run: .venv/bin/python -m pytest tests/test_massage.py -p no:homeassistant
           --cov=custom_components/sleepiq --cov-report=
       - run: .venv/bin/python -m pytest tests/ha

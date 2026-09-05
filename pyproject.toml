@@ -9,6 +9,11 @@ requires-python = ">=3.13"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Loaded before the entry point plugins, which is the only moment early enough
+# to stand in for the POSIX modules Home Assistant imports on the way in. It
+# does nothing on Linux, and so nothing in CI. Run pytest as `python -m pytest`
+# so the repository root is on sys.path and `tests.winposix` can be imported.
+addopts = "-p tests.winposix"
 # pytest-homeassistant-custom-component's `hass` fixture is async, and pytest
 # does not handle async fixtures natively. Without this every tests/ha test
 # errors with "requested an async fixture with no plugin or hook that handled
