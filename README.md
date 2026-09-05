@@ -66,6 +66,16 @@ Per sleeper, from core:
 | `{bed} {sleeper} core climate` | `select` | Climate360 heating and cooling levels (beds with core climate) |
 | `{bed} {sleeper} core climate timer` | `number` | Core climate run time, 0 to 600 minutes |
 
+The last four are hardware fitted **per side of the bed**, named after whoever
+sleeps on that side. Core keys the foot warmer and core climate selects on the
+sleeper, and a side with nobody registered on it falls back to the first
+sleeper: on a bed with one registered sleeper both sides then ask for the same
+unique id and Home Assistant keeps only the first entity. Here they are keyed on
+the bed and the physical side, like the two timer numbers beside them, so the
+bed gets both. An entity installed under core's id is migrated on startup and
+keeps its entity id and its history; **Removal** below says what that means if
+core's integration takes over again.
+
 Per bed, from core:
 
 | Entity | Platform | What it is |
@@ -116,11 +126,14 @@ install, restart Home Assistant.
 Either way Home Assistant will log that a custom integration is overriding a
 built-in one. That is expected.
 
-If you already have core's SleepIQ set up, the existing config entry is
-reused as-is - same domain, same unique ids, so no re-authentication and no new
-entities. The entities keep their entity ids; their **display names change**,
-because every name now comes from the translation file (see below). Otherwise
-add it from **Settings > Devices & services > Add integration > SleepIQ**.
+If you already have core's SleepIQ set up, the existing config entry is reused
+as-is - same domain, so no re-authentication and no duplicate entities. Every
+entity keeps its entity id and its history; their **display names change**,
+because every name now comes from the translation file (see below). Two unique
+ids change and are migrated on startup: the foot warmer and core climate
+selects move from the sleeper to the physical side, because core's key collides
+on a bed with one registered sleeper. Otherwise add it from **Settings >
+Devices & services > Add integration > SleepIQ**.
 
 Minimum Home Assistant version: **2026.8.0**.
 
@@ -449,9 +462,14 @@ can be watched live while the vendor app drives the bed.
    **Remove**; for a manual install delete `custom_components/sleepiq/`.
 3. Restart Home Assistant.
 
-Core's integration takes over again. Every non-massage entity keeps its unique
-id and history; the massage entities become unavailable and can be deleted
-from **Settings > Entities**. Nothing is stored outside the config entry.
+Core's integration takes over again. Every entity except three keeps its unique
+id and its history. The massage entities become unavailable and can be deleted
+from **Settings > Entities**. So do the foot warmer and core climate selects:
+core recreates them under its own sleeper-keyed ids as new entities, and the
+migrated ones are left behind to delete the same way - the price of the side
+key, which is what stops a bed with one registered sleeper losing one of each
+pair. Their timer numbers, and everything else, are untouched. Nothing is stored
+outside the config entry.
 
 ## Keeping in sync with core
 
@@ -485,12 +503,26 @@ exception translated, `PARALLEL_UPDATES` on every platform, no `_attr_name` or
 
 `python -m pytest tests -q` runs both suites: the massage model tests, which
 need only `asyncsleepiq`, and the Home Assistant layer tests, which need
-`pytest-homeassistant-custom-component`. The Home Assistant suite runs on
-Windows as well as Linux - its conftest hands the event loop a real socket pair
-for its own wakeup pipe and puts it on the selector loop, because aiodns
-refuses the proactor one. On Windows the first test of a session can fail the
-harness's own teardown check on a lingering shutdown thread; the assertions
-themselves run.
+`pytest-homeassistant-custom-component`.
+
+Three things make the Home Assistant suite run on a Windows workstation as well
+as on the Linux CI runner, and all three are needed:
+
+- `tests/winposix.py` stands in for `fcntl` and `resource`. Home Assistant
+  2026.8 imports both while pytest is still loading the harness plugin, before
+  any conftest runs, so without it the session aborts on
+  `ModuleNotFoundError: No module named 'fcntl'` and not one test is collected.
+  `pyproject.toml` loads it with `-p tests.winposix`, which pytest handles
+  before the entry point plugins. Run pytest as **`python -m pytest`** so the
+  repository root is on `sys.path`; a bare `pytest` may not find it.
+- `tests/ha/conftest.py` hands the event loop a real socket pair for its own
+  wakeup pipe, which the harness's socket block otherwise refuses.
+- The same conftest puts Home Assistant on the selector loop, because aiodns
+  refuses the proactor one Windows would pick.
+
+None of the three does anything on Linux. On Windows the first test of a
+session can still fail the harness's own teardown check on a lingering shutdown
+thread; the assertions themselves run.
 
 The GitHub Tests workflow is the check that counts: ruff, both suites over one
 coverage total gated at 95%, mypy in strict mode with Home Assistant installed,

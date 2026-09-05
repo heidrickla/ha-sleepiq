@@ -69,6 +69,14 @@ by the day the work landed.
   resolved to the first sleeper, so the two sides collided. They are now keyed
   on the bed and the physical side, and entities registered under the old ids
   are migrated automatically on update.
+- **The same collision in the foot warmer and core climate selects**, which are
+  core's. Both were keyed on the sleeper, so a bed with one registered sleeper
+  and hardware on both sides lost one entity of each pair. They are now keyed on
+  the bed and the physical side, like the timer numbers beside them, and an
+  entity installed under core's id is migrated on update and keeps its entity id
+  and history. This is a deliberate divergence from core: if core's SleepIQ
+  takes over again it recreates those two selects under its own ids and the
+  migrated ones are left to delete. README's Removal section says so.
 - The README documented the massage mode value `revitalize`; the option key the
   library uses, and the one an automation must send, is `revitilize`.
 
@@ -91,4 +99,10 @@ by the day the work landed.
   `custom_components/sleepiq` is 100%.
 - `tools/validate_local.py` refuses a quality scale rule filed `done` whose
   mechanism is not in the files.
-- The Home Assistant test suite runs on Windows as well as Linux.
+- The Home Assistant test suite runs on a Windows workstation as well as on the
+  Linux CI runner. It needs `tests/winposix.py`, which stands in for the `fcntl`
+  and `resource` modules Home Assistant 2026.8 imports while pytest is still
+  loading the harness plugin - before any conftest runs, so a Windows session
+  aborted with `ModuleNotFoundError` and collected nothing. `pyproject.toml`
+  loads it with `-p tests.winposix`; run pytest as `python -m pytest`. It does
+  nothing on Linux.
