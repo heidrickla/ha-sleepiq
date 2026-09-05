@@ -1,9 +1,9 @@
 """Fixtures for the Home Assistant layer tests.
 
-These run against Home Assistant, on Linux, in CI - not on a Windows
-workstation, where the harness blocks sockets and the ProactorEventLoop needs a
-local socket pair for its own self-pipe. They skip when the harness is absent,
-so the pure suite one level up still runs on a bare checkout.
+These run against Home Assistant. CI runs them on Linux; on a Windows
+workstation two things are shimmed below so the same suite runs there too.
+They skip when the harness is absent, so the pure suite one level up still
+runs on a bare checkout.
 
 THIS CONFTEST LIVES IN ITS OWN DIRECTORY ON PURPOSE. Its autouse fixture pulls
 in Home Assistant machinery, and a conftest applies to everything at or below
@@ -11,14 +11,17 @@ its directory; in tests/ it would attach to the pure tests and error them all.
 
 The bed fixtures follow core's tests/components/sleepiq/conftest.py at tag
 2026.8.2, cut down to what the vendored platforms need to load, plus a
-foundation that reports the massage board and a client whose GET answers the
-massage endpoint.
+foundation that reports the massage board and a client whose GET answers both
+the account's bed list and the massage endpoint.
 """
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Generator
 from copy import deepcopy
+import socket
+import sys
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, create_autospec, patch
 
@@ -26,16 +29,15 @@ import pytest
 
 pytest.importorskip("pytest_homeassistant_custom_component")
 
-from asyncsleepiq import (
-    BED_PRESETS,
-    Side,
-    SleepData,
-    SleepIQBed,
-    SleepIQFoundation,
-    SleepIQLight,
-    SleepIQPreset,
-    SleepIQSleeper,
-)
+from asyncsleepiq.actuator import SleepIQActuator
+from asyncsleepiq.bed import SleepIQBed
+from asyncsleepiq.consts import BED_PRESETS, CoreTemps, End, FootWarmingTemps, Side
+from asyncsleepiq.core_climate import SleepIQCoreClimate
+from asyncsleepiq.foot_warmer import SleepIQFootWarmer
+from asyncsleepiq.foundation import SleepIQFoundation
+from asyncsleepiq.light import SleepIQLight
+from asyncsleepiq.preset import SleepIQPreset
+from asyncsleepiq.sleeper import SleepData, SleepIQSleeper
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
@@ -43,9 +45,36 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.sleepiq.const import DOMAIN
 
+if sys.platform == "win32":
+    # ProactorEventLoop builds its self-pipe from socket.socketpair(), which
+    # the harness's socket block refuses, so every test errors before it runs.
+    # Hand socketpair the real socket class for the length of that one call;
+    # every other socket stays blocked, here and on the Linux CI runner.
+    _REAL_SOCKET = socket.socket
+    _REAL_SOCKETPAIR = socket.socketpair
+
+    def _unguarded_socketpair(*args: Any, **kwargs: Any) -> Any:
+        guarded = socket.socket
+        socket.socket = _REAL_SOCKET
+        try:
+            return _REAL_SOCKETPAIR(*args, **kwargs)
+        finally:
+            socket.socket = guarded
+
+    socket.socketpair = _unguarded_socketpair
+
+    # aiodns, which aiohttp resolves with, refuses to run on the Proactor loop
+    # Home Assistant picks on Windows. The selector loop runs the same tests.
+    from homeassistant import runner
+
+    runner.HassEventLoopPolicy._loop_factory = asyncio.SelectorEventLoop
+
 BED_ID = "123456"
 BED_NAME = "Test Bed"
 BED_NAME_LOWER = BED_NAME.lower().replace(" ", "_")
+BED_2_ID = "654321"
+BED_2_NAME = "Guest Bed"
+BED_2_NAME_LOWER = BED_2_NAME.lower().replace(" ", "_")
 SLEEPER_L_ID = "98765"
 SLEEPER_R_ID = "43219"
 SLEEPER_L_NAME = "SleeperL"
@@ -80,6 +109,7 @@ MASSAGE_PAYLOAD: dict[str, Any] = {
 }
 
 ADJUSTMENT_URL = f"bed/{BED_ID}/foundation/adjustment"
+MASSAGE_URL = f"bed/{BED_ID}/foundation/massage"
 
 
 @pytest.fixture(autouse=True)
@@ -97,38 +127,39 @@ def mock_setup_entry() -> Generator[AsyncMock]:
         yield mock_setup_entry
 
 
-@pytest.fixture
-def mock_bed() -> MagicMock:
-    """A bed with two sleepers, one light, one preset and the massage board."""
-    bed = create_autospec(SleepIQBed)
-    bed.name = BED_NAME
-    bed.id = BED_ID
-    bed.mac_addr = "12:34:56:78:AB:CD"
-    bed.model = "C10"
-    bed.paused = False
-    sleeper_l = create_autospec(SleepIQSleeper)
-    sleeper_r = create_autospec(SleepIQSleeper)
-    bed.sleepers = [sleeper_l, sleeper_r]
-
-    sleeper_l.side = Side.LEFT
-    sleeper_l.name = SLEEPER_L_NAME
-    sleeper_l.in_bed = True
-    sleeper_l.sleep_number = 40
-    sleeper_l.pressure = 1000
-    sleeper_l.sleeper_id = SLEEPER_L_ID
-    sleeper_l.sleep_data = SleepData(
+def make_sleeper(sleeper_id: str, name: str, side: Side) -> MagicMock:
+    """One sleeper, with last night's numbers."""
+    sleeper = create_autospec(SleepIQSleeper)
+    sleeper.side = side
+    sleeper.name = name
+    sleeper.sleeper_id = sleeper_id
+    sleeper.in_bed = side == Side.LEFT
+    sleeper.sleep_number = 40 if side == Side.LEFT else 80
+    sleeper.pressure = 1000 if side == Side.LEFT else 1400
+    sleeper.sleep_data = SleepData(
         duration=28800, sleep_score=85, heart_rate=60, respiratory_rate=14, hrv=68
     )
+    return sleeper
 
-    sleeper_r.side = Side.RIGHT
-    sleeper_r.name = SLEEPER_R_NAME
-    sleeper_r.in_bed = False
-    sleeper_r.sleep_number = 80
-    sleeper_r.pressure = 1400
-    sleeper_r.sleeper_id = SLEEPER_R_ID
-    sleeper_r.sleep_data = SleepData(
-        duration=25200, sleep_score=78, heart_rate=65, respiratory_rate=15, hrv=72
-    )
+
+def make_bed(
+    bed_id: str = BED_ID,
+    name: str = BED_NAME,
+    mac_addr: str = "12:34:56:78:AB:CD",
+    massage: bool = True,
+    sleeper_ids: tuple[str, str] = (SLEEPER_L_ID, SLEEPER_R_ID),
+) -> MagicMock:
+    """A bed with two sleepers, a light, a preset and the full foundation."""
+    bed = create_autospec(SleepIQBed)
+    bed.name = name
+    bed.id = bed_id
+    bed.mac_addr = mac_addr
+    bed.model = "C10"
+    bed.paused = False
+    bed.sleepers = [
+        make_sleeper(sleeper_ids[0], SLEEPER_L_NAME, Side.LEFT),
+        make_sleeper(sleeper_ids[1], SLEEPER_R_NAME, Side.RIGHT),
+    ]
 
     bed.foundation = create_autospec(SleepIQFoundation)
     bed.foundation.type = "splitKing"
@@ -136,7 +167,7 @@ def mock_bed() -> MagicMock:
     # light, foot control.
     bed.foundation.features = {
         "boardIsASingle": True,
-        "hasMassageAndLight": True,
+        "hasMassageAndLight": massage,
         "hasFootControl": True,
         "hasFootWarming": False,
         "hasUnderbedLight": True,
@@ -152,27 +183,117 @@ def mock_bed() -> MagicMock:
     preset.preset = PRESET_STATE
     preset.side = Side.NONE
     preset.side_full = "Right"
-    preset.options = BED_PRESETS
+    preset.options = list(BED_PRESETS)
     bed.foundation.presets = [preset]
 
-    bed.foundation.actuators = []
-    bed.foundation.foot_warmers = []
-    bed.foundation.core_climates = []
+    bed.foundation.actuators = [
+        make_actuator(Side.LEFT, End.HEAD, 45),
+        make_actuator(Side.NONE, End.FOOT, 0),
+    ]
+    bed.foundation.foot_warmers = [make_foot_warmer(Side.LEFT)]
+    bed.foundation.core_climates = [make_core_climate(Side.RIGHT)]
     return bed
 
 
+def make_actuator(side: Side, end: End, position: int) -> MagicMock:
+    """One head or foot actuator."""
+    actuator = create_autospec(SleepIQActuator)
+    actuator.side = side
+    actuator.side_full = "Left" if side == Side.LEFT else "Right"
+    actuator.actuator = end
+    actuator.actuator_full = "Head" if end == End.HEAD else "Foot"
+    actuator.position = position
+    return actuator
+
+
+def make_foot_warmer(side: Side) -> MagicMock:
+    """One foot warmer, off, with an hour on its timer."""
+    foot_warmer = create_autospec(SleepIQFootWarmer)
+    foot_warmer.side = side
+    foot_warmer.temperature = FootWarmingTemps.OFF.value
+    foot_warmer.timer = 60
+    foot_warmer.is_on = False
+    return foot_warmer
+
+
+def make_core_climate(side: Side) -> MagicMock:
+    """One core climate unit, off, with four hours on its timer."""
+    core_climate = create_autospec(SleepIQCoreClimate)
+    core_climate.side = side
+    core_climate.temperature = CoreTemps.OFF.value
+    core_climate.timer = 240
+    core_climate.is_on = False
+    return core_climate
+
+
 @pytest.fixture
-def mock_asyncsleepiq(mock_bed: MagicMock) -> Generator[MagicMock]:
+def mock_bed() -> MagicMock:
+    """The bed the account starts with."""
+    return make_bed()
+
+
+@pytest.fixture
+def second_bed() -> MagicMock:
+    """A second bed, with its own sleepers, for the add and remove tests."""
+    return make_bed(
+        bed_id=BED_2_ID,
+        name=BED_2_NAME,
+        mac_addr="AA:BB:CC:DD:EE:FF",
+        sleeper_ids=("11111", "22222"),
+    )
+
+
+@pytest.fixture
+def account(mock_bed: MagicMock) -> dict[str, MagicMock]:
+    """The beds the account reports, by id.
+
+    Adding to or removing from this dict is a bed added to or removed from the
+    SleepIQ account: the next poll reads the list and follows it.
+    """
+    return {BED_ID: mock_bed}
+
+
+@pytest.fixture
+def massage_payload() -> dict[str, Any]:
+    """What the bed answers on the massage endpoint; tests may change it."""
+    return deepcopy(MASSAGE_PAYLOAD)
+
+
+@pytest.fixture
+def mock_asyncsleepiq(
+    account: dict[str, MagicMock], massage_payload: dict[str, Any]
+) -> Generator[MagicMock]:
     """Replace the library client where setup constructs it.
 
-    The client is also the API: massage reads go through client.get and
-    writes through client.put, both recorded here rather than sent.
+    The client is also the API: the account's bed list and the massage reads
+    go through client.get and writes through client.put, all recorded here
+    rather than sent. init_beds() re-reads the account, as the library's does.
     """
     with patch("custom_components.sleepiq.AsyncSleepIQ", autospec=True) as mock:
         client = mock.return_value
-        client.beds = {BED_ID: mock_bed}
-        client.get.return_value = deepcopy(MASSAGE_PAYLOAD)
+        client.beds = dict(account)
+
+        def _get(url: str, **kwargs: Any) -> dict[str, Any]:
+            if url == "bed":
+                return {"beds": [{"bedId": bed_id} for bed_id in account]}
+            return deepcopy(massage_payload)
+
+        def _init_beds() -> None:
+            client.beds.clear()
+            client.beds.update(account)
+
+        client.get.side_effect = _get
+        client.init_beds.side_effect = _init_beds
         yield client
+
+
+def massage_reads(client: MagicMock) -> list[str]:
+    """The massage endpoints read so far, one entry per GET."""
+    return [
+        call.args[0]
+        for call in client.get.call_args_list
+        if call.args and call.args[0] != "bed"
+    ]
 
 
 async def setup_platform(

@@ -2,7 +2,8 @@
 
 from unittest.mock import MagicMock
 
-from asyncsleepiq import Side, SleepIQAPIException
+from asyncsleepiq.consts import Side
+from asyncsleepiq.exceptions import SleepIQAPIException
 from homeassistant.components.number import (
     ATTR_VALUE,
     DOMAIN as NUMBER_DOMAIN,
@@ -35,6 +36,7 @@ from .conftest import (
     SLEEPER_L_NAME_LOWER,
     SLEEPER_R_NAME,
     SLEEPER_R_NAME_LOWER,
+    massage_reads,
     setup_platform,
 )
 
@@ -147,15 +149,15 @@ async def test_selecting_a_mode_sends_wavemode_alone(
 
 
 async def test_the_state_follows_the_beds_readback_after_a_write(
-    hass: HomeAssistant, mock_asyncsleepiq
+    hass: HomeAssistant, mock_asyncsleepiq, massage_payload
 ) -> None:
     """A write triggers a refresh; what the bed then reports is the state."""
     await setup_platform(hass, [SELECT_DOMAIN])
-    mock_asyncsleepiq.get.return_value["leftSide"]["waveMode"] = 2
+    massage_payload["leftSide"]["waveMode"] = 2
     await _select(hass, MODE_L, "revitilize")
     await hass.async_block_till_done()
     assert hass.states.get(MODE_L).state == "revitilize"
-    assert mock_asyncsleepiq.get.call_count == 2
+    assert len(massage_reads(mock_asyncsleepiq)) == 2
 
 
 async def test_selecting_a_speed_sends_both_motors_and_the_armed_timer(
