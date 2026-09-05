@@ -1,8 +1,80 @@
 {
   "entity": {
+    "binary_sensor": {
+      "is_in_bed": {
+        "default": "mdi:bed-empty",
+        "state": {
+          "on": "mdi:bed"
+        }
+      }
+    },
+    "button": {
+      "calibrate": {
+        "default": "mdi:target"
+      },
+      "stop_pump": {
+        "default": "mdi:stop"
+      }
+    },
     "number": {
+      "actuator": {
+        "default": "mdi:arrow-expand-vertical"
+      },
+      "core_climate_timer": {
+        "default": "mdi:timer"
+      },
+      "firmness": {
+        "default": "mdi:bed"
+      },
+      "foot_position": {
+        "default": "mdi:arrow-expand-vertical"
+      },
+      "foot_warming_timer": {
+        "default": "mdi:timer"
+      },
+      "head_position": {
+        "default": "mdi:arrow-expand-vertical"
+      },
+      "left_foot_position": {
+        "default": "mdi:arrow-expand-vertical"
+      },
+      "left_head_position": {
+        "default": "mdi:arrow-expand-vertical"
+      },
       "massage_timer": {
         "default": "mdi:timer-vibrate"
+      },
+      "right_foot_position": {
+        "default": "mdi:arrow-expand-vertical"
+      },
+      "right_head_position": {
+        "default": "mdi:arrow-expand-vertical"
+      }
+    },
+    "select": {
+      "core_temps": {
+        "default": "mdi:heat-wave"
+      },
+      "foot_warmer_temp": {
+        "default": "mdi:heat-wave"
+      },
+      "left_preset": {
+        "default": "mdi:bed"
+      },
+      "massage_foot_speed": {
+        "default": "mdi:vibrate"
+      },
+      "massage_head_speed": {
+        "default": "mdi:vibrate"
+      },
+      "massage_mode": {
+        "default": "mdi:vibrate"
+      },
+      "preset": {
+        "default": "mdi:bed"
+      },
+      "right_preset": {
+        "default": "mdi:bed"
       }
     },
     "sensor": {
@@ -12,25 +84,25 @@
       "hrv": {
         "default": "mdi:heart-flash"
       },
+      "pressure": {
+        "default": "mdi:gauge"
+      },
       "respiratory_rate_avg": {
         "default": "mdi:lungs"
       },
       "sleep_duration": {
         "default": "mdi:sleep"
       },
+      "sleep_number": {
+        "default": "mdi:bed"
+      },
       "sleep_score": {
         "default": "mdi:sleep"
       }
     },
-    "select": {
-      "massage_mode": {
-        "default": "mdi:vibrate"
-      },
-      "massage_foot_speed": {
-        "default": "mdi:vibrate"
-      },
-      "massage_head_speed": {
-        "default": "mdi:vibrate"
+    "switch": {
+      "pause_mode": {
+        "default": "mdi:sleep-off"
       }
     }
   }

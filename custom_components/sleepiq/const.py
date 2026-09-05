@@ -1,7 +1,5 @@
 """Define constants for the SleepIQ component."""
 
-from homeassistant.const import PRESSURE
-
 DATA_SLEEPIQ = "data_sleepiq"
 DOMAIN = "sleepiq"
 
@@ -10,9 +8,11 @@ CORE_CLIMATE_TIMER = "core_climate_timer"
 CORE_CLIMATE = "core_climate"
 BED = "bed"
 FIRMNESS = "firmness"
-ICON_EMPTY = "mdi:bed-empty"
-ICON_OCCUPIED = "mdi:bed"
 IS_IN_BED = "is_in_bed"
+# The bed's own pressure reading. Core takes this from homeassistant.const,
+# which is a deprecated home for it; the string is the same either way and it
+# is this integration's entity type, so it lives here.
+PRESSURE = "pressure"
 SLEEP_NUMBER = "sleep_number"
 FOOT_WARMING_TIMER = "foot_warming_timer"
 FOOT_WARMER = "foot_warmer"
@@ -25,22 +25,17 @@ MASSAGE_MODE = "massage_mode"
 MASSAGE_FOOT_SPEED = "massage_foot_speed"
 MASSAGE_HEAD_SPEED = "massage_head_speed"
 MASSAGE_TIMER = "massage_timer"
-ENTITY_TYPES = {
-    ACTUATOR: "Position",
-    CORE_CLIMATE_TIMER: "Core Climate Timer",
-    CORE_CLIMATE: "Core Climate",
-    FIRMNESS: "Firmness",
-    PRESSURE: "Pressure",
-    IS_IN_BED: "Is In Bed",
-    SLEEP_NUMBER: "SleepNumber",
-    FOOT_WARMING_TIMER: "Foot Warming Timer",
-    FOOT_WARMER: "Foot Warmer",
-    SLEEP_SCORE: "Sleep Score",
-    SLEEP_DURATION: "Sleep Duration",
-    HEART_RATE: "Heart Rate Average",
-    RESPIRATORY_RATE: "Respiratory Rate Average",
-    HRV: "Heart Rate Variability",
-}
+
+# Translation keys for the entities whose name is not built from the type
+# constant above. Every entity name comes from strings.json.
+LIGHT = "light"
+PAUSE_MODE = "pause_mode"
+PRESET = "preset"
+HEART_RATE_AVG = "heart_rate_avg"
+RESPIRATORY_RATE_AVG = "respiratory_rate_avg"
+
+# Repair issues this integration raises, one key per issue.
+ISSUE_DEPRECATED_YAML = "deprecated_yaml"
 
 LEFT = "left"
 RIGHT = "right"

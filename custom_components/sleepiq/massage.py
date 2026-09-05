@@ -30,7 +30,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from asyncsleepiq import AsyncSleepIQ, Mode, Side, SleepIQBed, Speed
+from asyncsleepiq.asyncsleepiq import AsyncSleepIQ
+from asyncsleepiq.bed import SleepIQBed
+from asyncsleepiq.consts import Mode, Side, Speed
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,8 +70,8 @@ def _coerce[_EnumT: (Speed, Mode)](
         return default
 
 
-def massage_label(bed: SleepIQBed, side: Side) -> str:
-    """The word that names one side's massage entities.
+def side_label(bed: SleepIQBed, side: Side) -> str:
+    """The word that names one side's entities.
 
     The sleeper's first name when someone sleeps on that side, otherwise the
     physical side. "Lewis massage mode" is what someone reaches for; "Right
@@ -103,11 +105,6 @@ class SleepIQMassage:
         # Raw per-side block from the last GET, surfaced as entity attributes so
         # the full field set can be observed while the vendor app drives the bed.
         self.raw: dict[str, Any] = {}
-
-    @property
-    def side_full(self) -> str:
-        """Return the human-readable side name."""
-        return "Left" if self.side == Side.LEFT else "Right"
 
     def apply(self, payload: dict[str, Any]) -> None:
         """Update this side from a foundation/massage response."""
