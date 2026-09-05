@@ -104,5 +104,6 @@ by the day the work landed.
   and `resource` modules Home Assistant 2026.8 imports while pytest is still
   loading the harness plugin - before any conftest runs, so a Windows session
   aborted with `ModuleNotFoundError` and collected nothing. `pyproject.toml`
-  loads it with `-p tests.winposix`; run pytest as `python -m pytest`. It does
-  nothing on Linux.
+  loads it with `-p tests.winposix`, so pytest must be run as
+  `python -m pytest` on either platform, or with the repository root on
+  `PYTHONPATH`. The module itself does nothing on Linux.

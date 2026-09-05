@@ -513,8 +513,10 @@ as on the Linux CI runner, and all three are needed:
   any conftest runs, so without it the session aborts on
   `ModuleNotFoundError: No module named 'fcntl'` and not one test is collected.
   `pyproject.toml` loads it with `-p tests.winposix`, which pytest handles
-  before the entry point plugins. Run pytest as **`python -m pytest`** so the
-  repository root is on `sys.path`; a bare `pytest` may not find it.
+  before the entry point plugins. Run pytest as **`python -m pytest`**, on
+  either platform, so the repository root is on `sys.path`: a bare `pytest`
+  stops with `Error importing plugin "tests.winposix"` unless the root is on
+  `PYTHONPATH`. CI runs it as a module for the same reason.
 - `tests/ha/conftest.py` hands the event loop a real socket pair for its own
   wakeup pipe, which the harness's socket block otherwise refuses.
 - The same conftest puts Home Assistant on the selector loop, because aiodns
