@@ -3,11 +3,11 @@
 All notable changes to this project are recorded here, newest first, in the
 style of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-The integration has no releases yet: HACS installs it from the default branch,
-and `manifest.json` has said `0.1.0` since the first commit. Entries are dated
-by the day the work landed.
+`0.1.0` is the first release: `manifest.json` has said `0.1.0` since the first
+commit, and everything below is what that release carries. Entries are dated by
+the day the work landed.
 
-## [Unreleased] - 2026-09-04
+## [0.1.0] - 2026-09-05
 
 ### Added
 
