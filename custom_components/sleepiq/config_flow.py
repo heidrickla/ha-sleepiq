@@ -4,7 +4,8 @@ from collections.abc import Mapping
 import logging
 from typing import Any, override
 
-from asyncsleepiq import AsyncSleepIQ, SleepIQLoginException, SleepIQTimeoutException
+from asyncsleepiq.asyncsleepiq import AsyncSleepIQ
+from asyncsleepiq.exceptions import SleepIQLoginException, SleepIQTimeoutException
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
@@ -16,6 +17,7 @@ from homeassistant.helpers.selector import (
     TextSelectorConfig,
     TextSelectorType,
 )
+from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .const import DOMAIN
 
@@ -48,6 +50,27 @@ class SleepIQFlowHandler(ConfigFlow, domain=DOMAIN):
         return self.async_create_entry(
             title=import_data[CONF_USERNAME], data=import_data
         )
+
+    async def async_step_dhcp(
+        self, discovery_info: DhcpServiceInfo
+    ) -> ConfigFlowResult:
+        """Handle a bed seen on the network.
+
+        The bed announces itself by MAC prefix but says nothing about which
+        SleepIQ account owns it, and the integration talks to the cloud rather
+        than to the bed, so discovery can only offer the sign-in form. One
+        entry already covers every bed on an account, so a second bed on a
+        configured account has nothing to add.
+        """
+        _LOGGER.debug(
+            "SleepNumber bed discovered at %s (%s)",
+            discovery_info.ip,
+            discovery_info.macaddress,
+        )
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+        self.context["title_placeholders"] = {"name": "SleepNumber bed"}
+        return await self.async_step_user()
 
     @override
     async def async_step_user(
@@ -84,6 +107,49 @@ class SleepIQFlowHandler(ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
             last_step=True,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Change the account details of an entry that already exists.
+
+        The password may be left blank to keep the stored one, which is what
+        someone correcting a typo in the username wants. Pointing the entry at
+        a different account is refused: that is a second entry, with its own
+        beds, devices and history.
+        """
+        errors: dict[str, str] = {}
+        reconfigure_entry = self._get_reconfigure_entry()
+
+        if user_input is not None:
+            data = {
+                CONF_USERNAME: user_input[CONF_USERNAME],
+                CONF_PASSWORD: user_input.get(CONF_PASSWORD)
+                or reconfigure_entry.data[CONF_PASSWORD],
+            }
+            await self.async_set_unique_id(data[CONF_USERNAME].lower())
+            self._abort_if_unique_id_mismatch(reason="wrong_account")
+
+            if error := await try_connection(self.hass, data):
+                errors["base"] = error
+            else:
+                return self.async_update_reload_and_abort(
+                    reconfigure_entry, data_updates=data
+                )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_USERNAME,
+                        default=reconfigure_entry.data[CONF_USERNAME],
+                    ): str,
+                    vol.Optional(CONF_PASSWORD): PASSWORD_SELECTOR,
+                }
+            ),
+            errors=errors,
         )
 
     async def async_step_reauth(

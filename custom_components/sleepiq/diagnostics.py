@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from asyncsleepiq import SleepIQBed
+from asyncsleepiq.bed import SleepIQBed
 
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME

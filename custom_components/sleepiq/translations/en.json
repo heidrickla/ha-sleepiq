@@ -2,7 +2,9 @@
   "config": {
     "abort": {
       "already_configured": "Account is already configured",
-      "reauth_successful": "Re-authentication was successful"
+      "reauth_successful": "Re-authentication was successful",
+      "reconfigure_successful": "Re-configuration was successful",
+      "wrong_account": "That is a different SleepIQ account. Add it as its own entry instead."
     },
     "error": {
       "cannot_connect": "Failed to connect",
@@ -19,6 +21,18 @@
         "description": "The SleepIQ integration needs to re-authenticate your account {username}.",
         "title": "Reauthenticate integration"
       },
+      "reconfigure": {
+        "data": {
+          "password": "Password",
+          "username": "Username"
+        },
+        "data_description": {
+          "password": "Leave blank to keep the password already stored.",
+          "username": "The email address of the same SleepIQ account. A different account has to be added as its own entry."
+        },
+        "description": "Correct the account details this entry signs in with.",
+        "title": "Reconfigure SleepIQ"
+      },
       "user": {
         "data": {
           "password": "Password",
@@ -33,13 +47,62 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "is_in_bed": {
+        "name": "{sleeper} is in bed"
+      }
+    },
+    "button": {
+      "calibrate": {
+        "name": "Calibrate"
+      },
+      "stop_pump": {
+        "name": "Stop pump"
+      }
+    },
+    "light": {
+      "light": {
+        "name": "Light {outlet}"
+      }
+    },
     "number": {
+      "actuator": {
+        "name": "Position"
+      },
+      "core_climate_timer": {
+        "name": "{sleeper} core climate timer"
+      },
+      "firmness": {
+        "name": "{sleeper} firmness"
+      },
+      "foot_position": {
+        "name": "Foot position"
+      },
+      "foot_warming_timer": {
+        "name": "{sleeper} foot warming timer"
+      },
+      "head_position": {
+        "name": "Head position"
+      },
+      "left_foot_position": {
+        "name": "Left foot position"
+      },
+      "left_head_position": {
+        "name": "Left head position"
+      },
       "massage_timer": {
         "name": "{sleeper} massage timer"
+      },
+      "right_foot_position": {
+        "name": "Right foot position"
+      },
+      "right_head_position": {
+        "name": "Right head position"
       }
     },
     "select": {
       "core_temps": {
+        "name": "{sleeper} core climate",
         "state": {
           "cooling_high": "Cooling high",
           "cooling_low": "Cooling low",
@@ -51,6 +114,7 @@
         }
       },
       "foot_warmer_temp": {
+        "name": "{sleeper} foot warmer",
         "state": {
           "high": "High",
           "low": "Low",
@@ -58,14 +122,8 @@
           "off": "Off"
         }
       },
-      "massage_mode": {
-        "name": "{sleeper} massage mode",
-        "state": {
-          "off": "Off",
-          "soothe": "Smooth",
-          "revitilize": "Revitalize",
-          "wave": "Wave"
-        }
+      "left_preset": {
+        "name": "Left foundation preset"
       },
       "massage_foot_speed": {
         "name": "{sleeper} foot massage speed",
@@ -84,6 +142,49 @@
           "medium": "Medium",
           "high": "High"
         }
+      },
+      "massage_mode": {
+        "name": "{sleeper} massage mode",
+        "state": {
+          "off": "Off",
+          "soothe": "Smooth",
+          "revitilize": "Revitalize",
+          "wave": "Wave"
+        }
+      },
+      "preset": {
+        "name": "Foundation preset"
+      },
+      "right_preset": {
+        "name": "Right foundation preset"
+      }
+    },
+    "sensor": {
+      "heart_rate_avg": {
+        "name": "{sleeper} average heart rate"
+      },
+      "hrv": {
+        "name": "{sleeper} heart rate variability"
+      },
+      "pressure": {
+        "name": "{sleeper} pressure"
+      },
+      "respiratory_rate_avg": {
+        "name": "{sleeper} average respiratory rate"
+      },
+      "sleep_duration": {
+        "name": "{sleeper} sleep duration"
+      },
+      "sleep_number": {
+        "name": "{sleeper} SleepNumber"
+      },
+      "sleep_score": {
+        "name": "{sleeper} sleep score"
+      }
+    },
+    "switch": {
+      "pause_mode": {
+        "name": "Pause mode"
       }
     }
   },
@@ -97,6 +198,9 @@
     "invalid_auth": {
       "message": "SleepIQ rejected the stored username and password."
     },
+    "invalid_value": {
+      "message": "The bed cannot be set to that: {error}"
+    },
     "login_timeout": {
       "message": "Timed out signing in to SleepIQ."
     },
@@ -108,6 +212,15 @@
     },
     "update_timeout": {
       "message": "Timed out fetching bed data from SleepIQ."
+    },
+    "write_failed": {
+      "message": "The bed did not accept the change: {error}"
+    }
+  },
+  "issues": {
+    "deprecated_yaml": {
+      "description": "The SleepIQ account in your configuration.yaml has been imported into a config entry and the YAML block now does nothing. Remove the `sleepiq:` block from configuration.yaml and restart Home Assistant.",
+      "title": "The SleepIQ YAML configuration is no longer used"
     }
   }
 }

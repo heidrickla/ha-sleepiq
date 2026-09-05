@@ -3,8 +3,8 @@
 import logging
 from typing import Any
 
-from asyncsleepiq import (
-    AsyncSleepIQ,
+from asyncsleepiq.asyncsleepiq import AsyncSleepIQ
+from asyncsleepiq.exceptions import (
     SleepIQAPIException,
     SleepIQLoginException,
     SleepIQTimeoutException,
@@ -12,20 +12,26 @@ from asyncsleepiq import (
 import voluptuous as vol
 
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, PRESSURE, Platform
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers import config_validation as cv, entity_registry as er
+from homeassistant.helpers import (
+    config_validation as cv,
+    entity_registry as er,
+    issue_registry as ir,
+)
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     DOMAIN,
     IS_IN_BED,
+    ISSUE_DEPRECATED_YAML,
     MASSAGE_FOOT_SPEED,
     MASSAGE_HEAD_SPEED,
     MASSAGE_MODE,
     MASSAGE_TIMER,
+    PRESSURE,
     SLEEP_NUMBER,
 )
 from .coordinator import (
@@ -63,6 +69,18 @@ CONFIG_SCHEMA = vol.Schema(
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up sleepiq component."""
     if DOMAIN in config:
+        # The account is imported once and then lives in the config entry, so
+        # the YAML block does nothing on later restarts. Say so where the user
+        # will see it, with the one action that clears it.
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            ISSUE_DEPRECATED_YAML,
+            is_fixable=False,
+            issue_domain=DOMAIN,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=ISSUE_DEPRECATED_YAML,
+        )
         hass.async_create_task(
             hass.config_entries.flow.async_init(
                 DOMAIN, context={"source": SOURCE_IMPORT}, data=config[DOMAIN]
