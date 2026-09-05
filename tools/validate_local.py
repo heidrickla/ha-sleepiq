@@ -276,6 +276,13 @@ def missing_evidence(manifest: dict[str, Any]) -> dict[str, str]:
         "no entity sets _attr_has_entity_name",
     )
     want(
+        "entity-unique-id",
+        "sleeper_for_side" not in everything
+        and "_async_migrate_side_keyed_unique_ids" in component["__init__.py"],
+        "a unique id falls back to the first sleeper, which collides on a bed "
+        "where only one side has one, or the migration off that key is gone",
+    )
+    want(
         "icon-translations",
         os.path.isfile(os.path.join(COMP, "icons.json"))
         and "_attr_icon" not in everything,
