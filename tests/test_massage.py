@@ -14,13 +14,13 @@ import pytest
 
 pytest.importorskip("asyncsleepiq", reason="asyncsleepiq is not installed")
 
-from asyncsleepiq import Mode, Side, Speed
+from asyncsleepiq.consts import Mode, Side, Speed
 
 from custom_components.sleepiq.massage import (
     MASSAGE_DEFAULT_TIMER,
     SleepIQMassage,
     build_massage_sides,
-    massage_label,
+    side_label,
     update_massage,
 )
 
@@ -224,11 +224,11 @@ async def test_update_skips_the_request_for_a_bed_without_sides():
 
 def test_label_is_the_sleeper_on_that_side():
     bed = _bed((Side.LEFT, "Lewis"), (Side.RIGHT, "Sam"))
-    assert massage_label(bed, Side.LEFT) == "Lewis"
-    assert massage_label(bed, Side.RIGHT) == "Sam"
+    assert side_label(bed, Side.LEFT) == "Lewis"
+    assert side_label(bed, Side.RIGHT) == "Sam"
 
 
 def test_label_falls_back_to_the_physical_side_not_the_first_sleeper():
     bed = _bed((Side.LEFT, "Lewis"))
-    assert massage_label(bed, Side.RIGHT) == "Right"
-    assert massage_label(_bed((Side.RIGHT, "")), Side.RIGHT) == "Right"
+    assert side_label(bed, Side.RIGHT) == "Right"
+    assert side_label(_bed((Side.RIGHT, "")), Side.RIGHT) == "Right"
