@@ -16,7 +16,7 @@ from asyncsleepiq.exceptions import (
     SleepIQTimeoutException,
 )
 from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntryState
-from homeassistant.const import CONF_USERNAME, STATE_UNAVAILABLE
+from homeassistant.const import CONF_USERNAME, STATE_OFF, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import (
     device_registry as dr,
@@ -50,6 +50,7 @@ from .conftest import (
     SLEEPER_L_NAME,
     SLEEPER_L_NAME_LOWER,
     SLEEPIQ_CONFIG,
+    make_bed,
     massage_reads,
     setup_platform,
 )
@@ -206,6 +207,53 @@ async def test_a_bed_added_to_the_account_appears_on_the_next_poll(
     assert hass.states.get(IN_BED_L_2) is not None
     assert hass.states.get(IN_BED_L) is not None
     assert massage_reads(mock_asyncsleepiq)[-1] == f"bed/{BED_2_ID}/foundation/massage"
+
+
+async def test_the_beds_already_set_up_keep_the_objects_their_entities_read(
+    hass: HomeAssistant,
+    account: dict[str, MagicMock],
+    second_bed: MagicMock,
+    mock_bed: MagicMock,
+    mock_asyncsleepiq,
+) -> None:
+    """Re-reading the account must not orphan the entities already created.
+
+    init_beds() builds a new object for every bed. An entity holds the object
+    it was created with, so taking the new one for a bed that was already set
+    up would leave every entity of that bed reading a copy nothing updates.
+    """
+    await setup_platform(hass, ["binary_sensor"])
+
+    def _rebuild_every_bed() -> None:
+        mock_asyncsleepiq.beds.clear()
+        mock_asyncsleepiq.beds.update(
+            {
+                bed_id: make_bed(
+                    bed_id,
+                    bed.name,
+                    bed.mac_addr,
+                    sleeper_ids=(
+                        bed.sleepers[0].sleeper_id,
+                        bed.sleepers[1].sleeper_id,
+                    ),
+                )
+                for bed_id, bed in account.items()
+            }
+        )
+
+    mock_asyncsleepiq.init_beds.side_effect = _rebuild_every_bed
+    account[BED_2_ID] = second_bed
+    async_fire_time_changed(hass, utcnow() + UPDATE_INTERVAL)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert mock_asyncsleepiq.beds[BED_ID] is mock_bed
+    assert hass.states.get(IN_BED_L_2) is not None
+
+    # The kept object is still the one the entity reads.
+    mock_bed.sleepers[0].in_bed = False
+    async_fire_time_changed(hass, utcnow() + 2 * UPDATE_INTERVAL)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert hass.states.get(IN_BED_L).state == STATE_OFF
 
 
 async def test_a_bed_removed_from_the_account_loses_its_device(

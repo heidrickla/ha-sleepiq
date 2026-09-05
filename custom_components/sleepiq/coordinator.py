@@ -92,24 +92,38 @@ class SleepIQDataUpdateCoordinator(DataUpdateCoordinator[None]):
         """
         data = await self.client.get("bed")
         current = {bed["bedId"] for bed in data.get("beds", [])}
-        previous = set(self.client.beds)
-        if not current or current == previous:
+        previous_beds = dict(self.client.beds)
+        if not current or current == set(previous_beds):
             return
 
         _LOGGER.debug("Bed list changed, re-reading the account")
         await self.client.init_beds()
 
+        # init_beds() builds a new object for every bed, including the ones
+        # already set up, whose entities hold the old objects and would then
+        # read a copy nothing updates any more. Keep those and take only the
+        # beds that are new to the account.
+        self.client.beds = {
+            bed_id: previous_beds.get(bed_id, bed)
+            for bed_id, bed in self.client.beds.items()
+        }
+
         registry = dr.async_get(self.hass)
-        for bed_id in previous - set(self.client.beds):
+        for bed_id in set(previous_beds) - set(self.client.beds):
             device = registry.async_get_device(identifiers={(DOMAIN, bed_id)})
             if device is not None:
                 _LOGGER.debug("Removing bed %s, no longer on the account", bed_id)
                 registry.async_remove_device(device.id)
 
+        previous_sides = dict(self.massage_sides)
         self.massage_sides.clear()
         self.massage_sides.update(
             {
-                bed.id: build_massage_sides(self.client, bed)
+                bed.id: (
+                    previous_sides[bed.id]
+                    if bed.id in previous_sides
+                    else build_massage_sides(self.client, bed)
+                )
                 for bed in self.client.beds.values()
             }
         )
