@@ -1,9 +1,10 @@
 """Fixtures for the Home Assistant layer tests.
 
-These run against Home Assistant. CI runs them on Linux; on a Windows
-workstation two things are shimmed below so the same suite runs there too.
-They skip when the harness is absent, so the pure suite one level up still
-runs on a bare checkout.
+These run against Home Assistant. CI runs them on Linux. On a Windows
+workstation two things are shimmed below, and tests/winposix.py stands in for
+the POSIX modules Home Assistant imports before any conftest is loaded; all
+three are needed for the suite to run there. They skip when the harness is
+absent, so the pure suite one level up still runs on a bare checkout.
 
 THIS CONFTEST LIVES IN ITS OWN DIRECTORY ON PURPOSE. Its autouse fixture pulls
 in Home Assistant machinery, and a conftest applies to everything at or below
