@@ -1,9 +1,12 @@
 # The Integration Quality Scale, rule by rule, for a repository that vendors
-# core's sleepiq and adds massage control. "core sleepiq" in a comment means the
-# gap is core's own: the vendored file is byte-identical to core, core's sleepiq
-# does not meet the rule either, and fixing it here means forking that file.
-# Lewis, 2026-09-04: those forks are wave 2. Until then the rule is todo, not
-# hidden. The badge itself is core-only and manifest.json claims no tier.
+# core's sleepiq and adds massage control. Wave 1 recorded which rules core's
+# own sleepiq fails; wave 2 forked those files rather than inherit the gaps, so
+# every entity here is this project's to answer for. Evidence is the GitHub
+# Tests workflow, which runs on every push: ruff, both test suites with
+# coverage gated at 95%, mypy in strict mode with Home Assistant installed, and
+# tools/validate_local.py, which fails a rule filed `done` whose mechanism is
+# not in the files. The badge itself is core-only and manifest.json claims no
+# tier.
 rules:
   # Bronze
   action-setup:
@@ -15,7 +18,8 @@ rules:
       Three coordinators, core's cadence: bed and foundation status every
       60 seconds (presence and the massage countdown move on that scale),
       pause mode every 5 minutes, sleep health data hourly (it changes once a
-      night).
+      night). The 60 second poll also re-reads the account's bed list, which
+      is one extra GET and what dynamic-devices and stale-devices are built on.
   brands:
     status: done
     comment: |
@@ -27,16 +31,17 @@ rules:
   config-flow-test-coverage:
     status: done
     comment: |
-      tests/ha/test_config_flow.py covers the user step, both error mappings
-      each followed by a retry that reaches CREATE_ENTRY, the duplicate abort,
-      the YAML import in both outcomes, and reauth in both outcomes including
-      recovery from a wrong password. Every form that can show an error is
-      checked not to echo the password. Run by the GitHub Tests workflow on
-      every push.
+      tests/ha/test_config_flow.py covers every step: the user step, both
+      error mappings each followed by a retry that reaches CREATE_ENTRY, the
+      duplicate abort, the YAML import in both outcomes, DHCP discovery in
+      both outcomes, reconfigure with and without a new password including the
+      wrong-account abort and an error followed by recovery, and reauth in
+      both outcomes. Every form that can show an error is checked not to echo
+      the password. config_flow.py is at 100% line coverage.
   config-flow:
     status: done
     comment: |
-      Both steps describe every field in data_description, the password is a
+      Every step describes its fields in data_description, the password is a
       masked TextSelector with no default, and the unique id is the lowercased
       account name.
   dependency-transparency:
@@ -60,22 +65,23 @@ rules:
     status: done
     comment: |
       Entities are coordinator-driven; CoordinatorEntity subscribes in
-      async_added_to_hass and unsubscribes on removal. Nothing subscribes to
-      the library directly.
+      async_added_to_hass and unsubscribes on removal. The listener that adds
+      a later bed's entities is registered with entry.async_on_unload.
   entity-unique-id:
     status: done
     comment: |
       Massage entities are keyed on bed id and physical side, like core's foot
       warmer and core climate entities, so a bed with one sleeper gets two
       distinct sides. Entities created by the first release under the
-      sleeper-keyed id are migrated at setup.
+      sleeper-keyed id are migrated at setup. Every other unique id is core's
+      and is unchanged, so no installed entity was renamed by the fork.
   has-entity-name:
-    status: todo
+    status: done
     comment: |
-      The four massage entities have has_entity_name with translated names.
-      core sleepiq: the vendored binary_sensor, button, light, number, select
-      (preset, foot warmer, core climate), sensor and switch entities set a
-      hard-coded _attr_name as core ships them. Wave 2 forks them.
+      Every entity on every platform sets _attr_has_entity_name and takes its
+      name from strings.json; no _attr_name is left anywhere in the component,
+      which tools/validate_local.py enforces. Names read as "<bed> <sleeper>
+      firmness" rather than repeating "SleepNumber <bed>" in every entity.
   runtime-data: done
   test-before-configure:
     status: done
@@ -92,25 +98,29 @@ rules:
     status: done
     comment: |
       The lowercased account name is the unique id; adding the same account
-      twice aborts with already_configured. Tested.
+      twice aborts with already_configured, whether typed by the user or
+      offered by discovery. Tested.
 
   # Silver
   action-exceptions:
-    status: todo
+    status: done
     comment: |
-      Massage writes raise a translated HomeAssistantError when the bed
-      refuses them. core sleepiq: the vendored preset, foot warmer, core
-      climate, firmness, actuator, light, pause and button write paths let
-      the library's exceptions propagate raw. Wave 2 forks them.
+      Every write path on every platform goes through entity.async_write_to_bed,
+      which raises a translated HomeAssistantError when the bed refuses and a
+      translated ServiceValidationError when the library rejects the value as
+      out of range. Tested on the preset, foot warmer, core climate, firmness,
+      actuator, light, pause switch, buttons and massage entities.
   config-entry-unloading:
     status: done
     comment: |
       async_unload_platforms; the per-entry aiohttp session created with
       async_create_clientsession during setup is closed by Home Assistant on
-      unload.
+      unload, and each platform's new-bed listener is removed with the entry.
   docs-configuration-parameters:
     status: exempt
-    comment: There is no options flow; the account is the only setting.
+    comment: |
+      There is no options flow. The account is the only setting and the
+      reconfigure flow changes it; README documents both.
   docs-installation-parameters: done
   entity-unavailable:
     status: done
@@ -119,20 +129,21 @@ rules:
       GET runs in the same gather as bed and foundation status, so a failure
       of that endpoint alone also marks the status entities unavailable; the
       whole read comes from one account session and fails together in
-      practice. Buttons are stateless (core sleepiq).
+      practice. Buttons are stateless.
   integration-owner: done
   log-when-unavailable:
     status: done
     comment: |
       DataUpdateCoordinator logs once when a poll first fails and once when it
-      recovers. A rejected re-login during a poll now raises
-      ConfigEntryAuthFailed and starts reauth rather than logging a traceback
-      every 60 seconds.
+      recovers. A rejected re-login during a poll raises ConfigEntryAuthFailed
+      and starts reauth rather than logging a traceback every 60 seconds.
   parallel-updates:
-    status: todo
+    status: done
     comment: |
-      select.py and number.py set PARALLEL_UPDATES = 1. core sleepiq: the
-      other five platforms are byte-identical to core and set nothing. Wave 2.
+      The read-only platforms (binary_sensor, sensor) set 0: the coordinator
+      does the polling. Every platform that writes to the bed (button, light,
+      number, select, switch) sets 1, because the cloud API is happiest with
+      one request in flight per account.
   reauthentication-flow:
     status: done
     comment: |
@@ -140,19 +151,20 @@ rules:
       during any poll raises ConfigEntryAuthFailed and starts it. Tested in
       both outcomes.
   test-coverage:
-    status: todo
+    status: done
     comment: |
-      The GitHub Tests workflow runs the pure massage suite and tests/ha with
-      --cov=custom_components/sleepiq on every push and reports per-module
-      coverage. Not gated at 95% yet: the vendored platforms are exercised
-      only where the massage tests load them, and core's own platform tests
-      are not vendored. Vendor them or write equivalents, then add
-      --cov-fail-under=95.
+      The GitHub Tests workflow runs the pure massage suite and the Home
+      Assistant layer suite over one coverage total and fails under 95%. It
+      stands at 100% of custom_components/sleepiq, with every platform, both
+      migrations, the discovery and reconfigure flows, the repair issue, and
+      the added and removed bed paths exercised.
 
   # Gold
   devices:
     status: done
-    comment: One device per bed, keyed on its MAC, with manufacturer and model.
+    comment: |
+      One device per bed, keyed on its MAC and its bed id, with manufacturer
+      and model.
   diagnostics:
     status: done
     comment: |
@@ -163,18 +175,19 @@ rules:
       investigation needs to watch it live while the vendor app drives the
       bed, which a downloaded snapshot cannot do.
   discovery:
-    status: todo
+    status: done
     comment: |
-      core sleepiq: the manifest matches DHCP on the bed's MAC prefix but the
-      flow has no async_step_dhcp, so a discovered bed only opens the login
-      form without a unique id. A proper step would key on the account, which
-      the hub does not announce. Wave 2 decides whether to drop the dhcp
-      match or implement the step.
+      The manifest matches the bed's DHCP MAC prefix and the flow has an
+      async_step_dhcp. The bed announces nothing about which SleepIQ account
+      owns it and the integration talks to the cloud, so the step offers the
+      sign-in form; when an entry already exists it aborts, because one entry
+      covers every bed on the account. Both outcomes are tested.
   discovery-update-info:
     status: exempt
     comment: |
-      Cloud polling. The bed's LAN address is never used, so there is no
-      network information a discovery could update.
+      Cloud polling. The config entry holds an account, never an address, and
+      the bed's LAN address is not used at any point, so a discovery carries
+      no network information that could be updated.
   docs-data-update: done
   docs-examples: done
   docs-known-limitations: done
@@ -183,18 +196,21 @@ rules:
   docs-troubleshooting: done
   docs-use-cases: done
   dynamic-devices:
-    status: todo
+    status: done
     comment: |
-      core sleepiq: beds are enumerated once at setup. A bed added to the
-      account appears after a reload, not on the next poll.
+      The 60 second poll reads the account's bed list; when it differs from
+      the beds already loaded the account is enumerated again and every
+      platform's coordinator listener adds the new bed's entities. A bed
+      bought later needs no reload. Tested.
   entity-category:
     status: done
     comment: |
-      Every entity is a control or a reading someone reaches for on the bed's
-      card, so none gets a category. The massage timer was considered for
-      CONFIG and rejected: it is an armed countdown set at massage time, the
-      same shape as core's foot warming and core climate timers, not a
-      device setting.
+      The calibrate button is CONFIG: re-baselining the pressure sensors sets
+      the bed up rather than operating it. Everything else is a control or a
+      reading someone reaches for on the bed's card, including the massage
+      timer, which was considered for CONFIG and rejected: it is an armed
+      countdown set at massage time, the same shape as core's foot warming and
+      core climate timers, not a device setting.
   entity-device-class:
     status: done
     comment: |
@@ -209,43 +225,50 @@ rules:
       reading users install this for; the pressure sensor is core's choice
       and is what the sleep number is derived from.
   entity-translations:
-    status: todo
+    status: done
     comment: |
-      The massage entities have translated names with the sleeper as a
-      placeholder. core sleepiq: the vendored entities carry hard-coded
-      English names and translate states only. Wave 2 with has-entity-name.
+      Every entity has a translated name in strings.json, with the sleeper or
+      the side as a placeholder where a bed has two of a thing, and one key
+      per side and end for the actuators so no name is assembled from English
+      words. tools/validate_local.py fails a translation key with no name and
+      a name no platform uses.
   exception-translations:
     status: done
     comment: |
-      Every HomeAssistantError, ConfigEntryAuthFailed, ConfigEntryNotReady
-      and UpdateFailed this repository raises carries a translation key, and
-      tools/validate_local.py fails on one that does not, in any module. The
-      vendored write paths raise library exceptions untranslated; that is the
-      action-exceptions gap, tracked there.
+      Every HomeAssistantError, ServiceValidationError, ConfigEntryAuthFailed,
+      ConfigEntryNotReady and UpdateFailed this integration raises carries a
+      translation key, including the shared write helper every platform's
+      write path goes through. tools/validate_local.py fails on one that does
+      not, in any module.
   icon-translations:
-    status: todo
+    status: done
     comment: |
-      The massage entities take their icons from icons.json. core sleepiq:
-      the vendored base classes set _attr_icon = mdi:bed on every coordinator
-      entity and the number and button descriptions carry icons, which
-      overrides icons.json. Wave 2.
+      Icons come from icons.json through the translation key; no _attr_icon is
+      left anywhere in the component, which tools/validate_local.py enforces.
+      The presence sensor's bed and empty-bed icons are state icons on its
+      key. Entities whose device class already supplies the right icon get no
+      override.
   reconfiguration-flow:
-    status: exempt
+    status: done
     comment: |
-      The account name is the entry's identity and its unique id; changing it
-      is a different account and a new entry. The password is the only other
-      setting and is handled by the reauth flow.
+      async_step_reconfigure corrects the account the entry signs in with,
+      keeping the stored password when the field is left blank and aborting
+      with wrong_account when the username belongs to a different account,
+      which would be a second entry with its own beds and history.
   repair-issues:
-    status: todo
+    status: done
     comment: |
-      core sleepiq: the legacy YAML import path still exists and creates no
-      deprecated_yaml repair issue. Nothing else needs the user's hand;
-      authentication failures go to reauth.
+      Importing the deprecated YAML block raises a repair issue that names the
+      one action that clears it: delete the sleepiq block from
+      configuration.yaml. Nothing else needs the user's hand; authentication
+      failures go to reauth, which is a flow rather than an issue.
   stale-devices:
-    status: todo
+    status: done
     comment: |
-      core sleepiq: a bed removed from the account keeps its device until the
-      entry is removed.
+      A bed that leaves the account is removed from the device registry on the
+      next poll, taking its entities with it. A bed list that comes back empty
+      is treated as a hiccup rather than as every bed being removed. Tested in
+      both directions.
 
   # Platinum
   async-dependency:
@@ -260,14 +283,10 @@ rules:
   strict-typing:
     status: done
     comment: |
-      pyproject.toml runs mypy with strict = true and no relaxations; the
-      GitHub Tests job runs it with Home Assistant installed on every push,
-      and that configuration was green against Home Assistant 2026.8.3 before
-      the first push. The attribute injection onto the library's foundation
-      object is gone: the massage objects live on the coordinator and in
-      runtime_data. Two scoped overrides keep implicit re-export for
-      asyncsleepiq and for homeassistant.components.light, whose __init__
-      modules export names by import without an __all__; both are other
-      people's modules imported by byte-identical core files. asyncsleepiq
-      ships py.typed. A local run without Home Assistant sees every HA class
-      as Any and is not the check.
+      pyproject.toml runs mypy with strict = true, no relaxations and no
+      per-module allowance for the component or its libraries: every name is
+      imported from the module that defines it, because neither asyncsleepiq
+      nor homeassistant.components.light re-exports explicitly and strict mode
+      is right to say so. The GitHub Tests job runs it with Home Assistant
+      installed on every push. asyncsleepiq ships py.typed. A local run
+      without Home Assistant sees every HA class as Any and is not the check.

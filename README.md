@@ -44,34 +44,41 @@ half - no library fork, no patched dependency.
 
 ## Supported functions
 
+Every entity below is created and enabled by default. Each bed is one device,
+and an entity's full name begins with the device name - the bed's name in the
+SleepIQ app - so the tables show the part that follows it.
+
 Per sleeper, from core:
 
 | Entity | Platform | What it is |
 | --- | --- | --- |
-| `SleepNumber {bed} {sleeper} Is In Bed` | `binary_sensor` | Occupancy from the bed's pressure sensor |
-| `SleepNumber {bed} {sleeper} Pressure` | `sensor` | Raw air pressure reading, SleepNumber's own units |
-| `SleepNumber {bed} {sleeper} SleepNumber` | `sensor` | Current firmness setting |
-| `SleepNumber {bed} {sleeper} Firmness` | `number` | Firmness, 5 to 100 in steps of 5 |
-| `SleepNumber {bed} {sleeper} Sleep Score` | `sensor` | Last night's SleepIQ score |
-| `SleepNumber {bed} {sleeper} Sleep Duration` | `sensor` | Last night's time in bed, hours |
-| `SleepNumber {bed} {sleeper} Heart Rate Average` | `sensor` | Last night's average heart rate |
-| `SleepNumber {bed} {sleeper} Respiratory Rate Average` | `sensor` | Last night's average breathing rate |
-| `SleepNumber {bed} {sleeper} Heart Rate Variability` | `sensor` | Last night's HRV, milliseconds |
-| `SleepNumber {bed} {sleeper} Foot Warmer` | `select` | Foot warming: off, low, medium, high (beds with foot warming) |
-| `SleepNumber {bed} {sleeper} Foot Warming Timer` | `number` | Foot warming run time, 30 to 360 minutes |
-| `SleepNumber {bed} {sleeper} Core Climate` | `select` | Climate360 heating and cooling levels (beds with core climate) |
-| `SleepNumber {bed} {sleeper} Core Climate Timer` | `number` | Core climate run time, minutes |
+| `{bed} {sleeper} is in bed` | `binary_sensor` | Occupancy from the bed's pressure sensor |
+| `{bed} {sleeper} pressure` | `sensor` | Raw air pressure reading, SleepNumber's own units |
+| `{bed} {sleeper} SleepNumber` | `sensor` | Current firmness setting |
+| `{bed} {sleeper} firmness` | `number` | Firmness, 5 to 100 in steps of 5 |
+| `{bed} {sleeper} sleep score` | `sensor` | Last night's SleepIQ score |
+| `{bed} {sleeper} sleep duration` | `sensor` | Last night's time in bed, hours |
+| `{bed} {sleeper} average heart rate` | `sensor` | Last night's average heart rate |
+| `{bed} {sleeper} average respiratory rate` | `sensor` | Last night's average breathing rate |
+| `{bed} {sleeper} heart rate variability` | `sensor` | Last night's HRV, milliseconds |
+| `{bed} {sleeper} foot warmer` | `select` | Foot warming: off, low, medium, high (beds with foot warming) |
+| `{bed} {sleeper} foot warming timer` | `number` | Foot warming run time, 30 to 360 minutes |
+| `{bed} {sleeper} core climate` | `select` | Climate360 heating and cooling levels (beds with core climate) |
+| `{bed} {sleeper} core climate timer` | `number` | Core climate run time, 0 to 600 minutes |
 
 Per bed, from core:
 
 | Entity | Platform | What it is |
 | --- | --- | --- |
-| `SleepNumber {bed} {side} {Head/Foot} Position` | `number` | Actuator position, 0 to 100 (beds with an adjustable foundation) |
-| `SleepNumber {bed} Foundation Preset {side}` | `select` | Favorite, Read, Watch TV, Flat, Zero G, Snore |
-| `SleepNumber {bed} Light {n}` | `light` | Under-bed light or night stand outlet |
-| `SleepNumber {bed} Pause Mode` | `switch` | Privacy mode: stops the bed reporting sleep data |
-| `SleepNumber {bed} Calibrate` | `button` | Re-baseline the pressure sensors |
-| `SleepNumber {bed} Stop Pump` | `button` | Stop a firmness adjustment in progress |
+| `{bed} {Left/Right} {head/foot} position` | `number` | Actuator position, 0 to 100 (beds with an adjustable foundation) |
+| `{bed} {Left/Right} foundation preset` | `select` | Favorite, Read, Watch TV, Flat, Zero G, Snore |
+| `{bed} Light {n}` | `light` | Under-bed light or night stand outlet |
+| `{bed} Pause mode` | `switch` | Privacy mode: stops the bed reporting sleep data |
+| `{bed} Calibrate` | `button` | Re-baseline the pressure sensors. Filed under **Configuration** on the device page, because it sets the bed up rather than operating it |
+| `{bed} Stop pump` | `button` | Stop a firmness adjustment in progress |
+
+A foundation that reports no side names its positions and its preset without
+one: `{bed} Head position`, `{bed} Foundation preset`.
 
 Per side, added by this repository, for beds whose foundation reports the
 massage board:
@@ -110,9 +117,12 @@ Either way Home Assistant will log that a custom integration is overriding a
 built-in one. That is expected.
 
 If you already have core's SleepIQ set up, the existing config entry is
-reused as-is - same domain, same unique ids, so no re-authentication and no
-entity renames for the core entities. Otherwise add it from **Settings >
-Devices & services > Add integration > SleepIQ**.
+reused as-is - same domain, same unique ids, so no re-authentication and no new
+entities. The entities keep their entity ids; their **display names change**,
+because every name now comes from the translation file (see below). Otherwise
+add it from **Settings > Devices & services > Add integration > SleepIQ**.
+
+Minimum Home Assistant version: **2026.8.0**.
 
 ### Installation parameters
 
@@ -121,10 +131,26 @@ Devices & services > Add integration > SleepIQ**.
 | Username | yes | The email address you sign in to the SleepIQ app with. One entry covers every bed on the account. |
 | Password | yes | The password for that account. It is stored in the config entry and never shown again. |
 
-There are no options to configure after setup. If the password changes, Home
-Assistant asks for the new one through a re-authentication prompt; the
-username cannot be changed in place, because it identifies the entry - remove
-the entry and add the other account.
+### Discovery
+
+A SleepNumber bed on the same network is picked up by Home Assistant's DHCP
+watcher and appears as a discovered **SleepIQ** card. The bed announces nothing
+about which SleepIQ account owns it, and this integration talks to the cloud
+rather than to the bed, so the card opens the same sign-in form. When an
+account is already set up the discovery is ignored: one entry already covers
+every bed on it.
+
+### Configuration options
+
+There are no options to configure after setup; the account is the only setting.
+
+- **The password changed.** Home Assistant asks for the new one through a
+  re-authentication prompt.
+- **The username was wrong, or the account's email changed.** **Settings >
+  Devices & services > SleepIQ > three dots > Reconfigure**. Leave the password
+  blank to keep the stored one. Pointing the entry at a *different* account is
+  refused - that is a second entry, with its own beds and history; add it from
+  **Add integration** instead.
 
 ## Data updates
 
@@ -133,6 +159,7 @@ directly, so nothing on your network needs configuring.
 
 | Data | Interval |
 | --- | --- |
+| The account's list of beds | every 60 seconds |
 | Presence, pressure, firmness, foundation positions, presets, lights, massage state | every 60 seconds |
 | Pause mode | every 5 minutes |
 | Sleep score, duration, heart rate, respiratory rate, HRV | every hour |
@@ -142,6 +169,12 @@ entity shows the new value straight away. The massage entities then request a
 refresh, so what you see a moment later is what the bed reports, not what was
 asked for. The cloud's own view of the bed can lag a few seconds behind the
 remote or the app.
+
+**Beds added or removed on the account are followed.** The 60 second poll reads
+the account's bed list; when it differs, the account is read again in full, a
+new bed gets its device and its entities, and a bed that has left loses its
+device and everything under it. No reload, no restart. A bed list that comes
+back empty is treated as a cloud hiccup and changes nothing.
 
 ## Use cases
 
@@ -185,7 +218,7 @@ automation:
   - alias: Massage off when out of bed
     triggers:
       - trigger: state
-        entity_id: binary_sensor.sleepnumber_master_bedroom_lewis_is_in_bed
+        entity_id: binary_sensor.master_bedroom_lewis_is_in_bed
         to: "off"
         for: "00:02:00"
     actions:
@@ -199,7 +232,10 @@ automation:
 ```
 
 Entity ids follow the bed's name and the sleeper's first name; take the exact
-ids from **Settings > Devices & services > SleepIQ > the bed**.
+ids from **Settings > Devices & services > SleepIQ > the bed**. Entities that
+were created before this release keep the entity id they were given, which for
+the core entities began with `sleepnumber_`. Nothing renames them; the examples
+show what a fresh install gets.
 
 ## How the massage controls behave
 
@@ -332,15 +368,12 @@ timer arming correctly.
 
 - This shadows core's `sleepiq`. When Home Assistant updates its copy, this one
   does not follow until it is resynced (see below).
-- Beds are read from the account when the integration loads. A bed added to or
-  removed from the account shows up after **Settings > Devices & services >
-  SleepIQ > Reload**, not on the next poll.
-- The core entities keep core's naming (`SleepNumber {bed} ...` hard-coded in
-  English); only the massage entities are translated. Bringing the core
-  entities up to the same standard is planned; `quality_scale.yaml` records
-  exactly which rules that affects.
 - One failed read of any endpoint marks every entity of that poll unavailable
   until the next successful one.
+- A bed is followed by the account's list, not by anything the bed itself
+  announces, so a bed that the cloud stops listing while it is still yours -
+  during an outage that answers with a short list rather than an error - would
+  be removed. An empty list is ignored, a short one is not.
 
 ## Troubleshooting
 
@@ -373,9 +406,26 @@ That is the open limitation above; use the head and foot speeds instead.
 the bed's arming window. Set the timer, then start a speed straight after, as
 in the examples.
 
-**"The bed did not accept the massage change"** - the cloud refused the write.
-The entity keeps its last known state. Try again; if it persists, the error
-text carries the API's response code.
+**"The bed did not accept the change"** or **"The bed did not accept the
+massage change"** - the cloud refused the write. The entity keeps its last
+known state. Try again; if it persists, the error text carries the API's
+response code.
+
+**"The bed cannot be set to that"** - the value was outside what the bed
+accepts (a firmness outside 5-100, a foot warming time outside 30-360). The
+message carries the library's own explanation.
+
+**A repair notice about the SleepIQ YAML configuration** - the `sleepiq:` block
+in `configuration.yaml` was imported into a config entry when the integration
+first started and now does nothing. Delete the block and restart; the notice
+goes with it. Nothing else is affected: the account keeps working from the
+config entry.
+
+**Every entity was renamed after updating** - expected once, in the release
+that moved naming into the translation file. `SleepNumber Master Bedroom Lewis
+Firmness` became `Master Bedroom Lewis firmness`. Entity ids, unique ids and
+history are untouched; only the display name changed. Rename any entity you
+prefer differently in **Settings > Entities**.
 
 **Two sets of massage controls for one sleeper, or entity ids ending in `_2`
 after updating** - versions before September 2026 keyed the massage entities
@@ -418,19 +468,33 @@ curl -s -o /tmp/select.py   https://raw.githubusercontent.com/home-assistant/cor
 sha256sum /tmp/select.py
 ```
 
-A changed hash means upstream moved and that file needs its massage additions
-re-applied. `NOTICE` lists exactly which files were modified and how, so the
-diff to carry forward is small. `python tools/validate_local.py` checks the
-unmodified files still match and the modified ones are all described.
+A changed hash means upstream moved and that file needs this project's changes
+re-applied. `NOTICE` lists exactly what those are, file by file. Every file is
+now marked `modified`: naming, icons and error handling run through all seven
+platforms, so there is no longer an untouched file to compare byte for byte.
+The recorded hashes remain the starting point of the next resync diff, and
+`python tools/validate_local.py` checks that every modified file is described.
 
 ## Development
 
 `python tools/validate_local.py` runs the offline checks: the vendored files
 against the baseline, translations against icons and code, every user-facing
-exception translated, the quality scale complete. `python -m pytest tests -q`
-runs the massage model tests anywhere and the Home Assistant layer tests where
-the test harness is installed (Linux; the GitHub Tests workflow runs them,
-mypy in strict mode and coverage on every push).
+exception translated, `PARALLEL_UPDATES` on every platform, no `_attr_name` or
+`_attr_icon` left anywhere, the quality scale complete, and every rule filed
+`done` against the mechanism it would need to be true.
+
+`python -m pytest tests -q` runs both suites: the massage model tests, which
+need only `asyncsleepiq`, and the Home Assistant layer tests, which need
+`pytest-homeassistant-custom-component`. The Home Assistant suite runs on
+Windows as well as Linux - its conftest hands the event loop a real socket pair
+for its own wakeup pipe and puts it on the selector loop, because aiodns
+refuses the proactor one. On Windows the first test of a session can fail the
+harness's own teardown check on a lingering shutdown thread; the assertions
+themselves run.
+
+The GitHub Tests workflow is the check that counts: ruff, both suites over one
+coverage total gated at 95%, mypy in strict mode with Home Assistant installed,
+and the validator, on every push.
 
 ## Upstreaming
 

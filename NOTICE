@@ -17,19 +17,49 @@ Files added by this project, with no upstream counterpart:
   * quality_scale.yaml - Integration Quality Scale record
   * translations/      - runtime translations (a copy of strings.json)
 
-Modifications by this project, relative to that baseline:
+Modifications by this project, relative to that baseline. Three of them run
+through every platform: entity names come from strings.json through a
+translation key instead of a hard-coded English string, icons come from
+icons.json instead of _attr_icon, and every write to the bed raises a
+translated HomeAssistantError instead of letting the library's exception
+escape. Every name is also imported from the module that defines it, because
+mypy in strict mode does not accept either library's implicit re-exports.
 
-  * __init__.py    - build massage objects during setup, translated setup
-                     exceptions, migration of massage unique ids
-  * config_flow.py - masked password selector on the user and reauth forms
-  * const.py       - massage entity type constants
-  * coordinator.py - fetch massage state on each refresh, translated poll
-                     exceptions, login failure raised as ConfigEntryAuthFailed
-  * select.py      - massage mode and head/foot speed select entities,
-                     PARALLEL_UPDATES
-  * number.py      - massage timer number entity, PARALLEL_UPDATES
-  * strings.json   - massage translations, field descriptions, exception
-                     messages; core-only [%key:...] references replaced with
-                     literals, which do not resolve outside core
-  * icons.json     - massage icons
-  * manifest.json  - custom component identity and version
+  * __init__.py      - build massage objects during setup, translated setup
+                       exceptions, migration of massage unique ids, a repair
+                       issue when the deprecated YAML block is imported
+  * binary_sensor.py - has_entity_name and a translated name, icons.json,
+                       PARALLEL_UPDATES, entities added for beds found later
+  * button.py        - translated names, icons.json, PARALLEL_UPDATES,
+                       translated write failures, calibration filed as a
+                       configuration entity
+  * config_flow.py   - masked password selector on every form, a DHCP
+                       discovery step, a reconfigure flow
+  * const.py         - massage entity type constants, translation keys, the
+                       repair issue key; core's ENTITY_TYPES name table and
+                       icon constants dropped with the hard-coded names
+  * coordinator.py   - fetch massage state on each refresh, translated poll
+                       exceptions, login failure raised as ConfigEntryAuthFailed,
+                       the account's bed list followed as beds are added and
+                       removed
+  * entity.py        - has_entity_name on the base classes, the bed id as a
+                       device identifier, the shared write helper, the helper
+                       that adds a later bed's entities
+  * light.py         - translated name per outlet, PARALLEL_UPDATES,
+                       translated write failures
+  * number.py        - massage timer number entity, translated names per side
+                       and end, icons.json, PARALLEL_UPDATES, translated write
+                       failures
+  * select.py        - massage mode and head/foot speed select entities,
+                       translated names, icons.json, PARALLEL_UPDATES,
+                       translated write failures
+  * sensor.py        - translated names per sleeper, icons.json
+  * switch.py        - translated name, icons.json, PARALLEL_UPDATES,
+                       translated write failures
+  * strings.json     - a name for every entity, massage translations, field
+                       descriptions, exception messages, the repair issue;
+                       core-only [%key:...] references replaced with literals,
+                       which do not resolve outside core
+  * icons.json       - an icon for every entity that needs one beyond its
+                       device class
+  * manifest.json    - custom component identity and version
