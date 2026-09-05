@@ -7,8 +7,8 @@ from datetime import timedelta
 import logging
 from typing import Any, override
 
-from asyncsleepiq import (
-    AsyncSleepIQ,
+from asyncsleepiq.asyncsleepiq import AsyncSleepIQ
+from asyncsleepiq.exceptions import (
     SleepIQAPIException,
     SleepIQLoginException,
     SleepIQTimeoutException,
@@ -18,10 +18,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN
-from .massage import SleepIQMassage, update_massage
+from .massage import SleepIQMassage, build_massage_sides, update_massage
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -80,8 +81,43 @@ class SleepIQDataUpdateCoordinator(DataUpdateCoordinator[None]):
         self.client = client
         self.massage_sides = massage_sides
 
+    async def _async_follow_the_account(self) -> None:
+        """Re-read the account's beds so added and removed ones are followed.
+
+        One GET per poll lists the account. Only when that list differs from
+        the beds already loaded does the full enumeration run again, which is
+        what builds sleepers, foundations and massage objects. A list that
+        comes back empty is treated as a hiccup rather than as every bed being
+        removed: an account with no beds cannot have set up in the first place.
+        """
+        data = await self.client.get("bed")
+        current = {bed["bedId"] for bed in data.get("beds", [])}
+        previous = set(self.client.beds)
+        if not current or current == previous:
+            return
+
+        _LOGGER.debug("Bed list changed, re-reading the account")
+        await self.client.init_beds()
+
+        registry = dr.async_get(self.hass)
+        for bed_id in previous - set(self.client.beds):
+            device = registry.async_get_device(identifiers={(DOMAIN, bed_id)})
+            if device is not None:
+                _LOGGER.debug("Removing bed %s, no longer on the account", bed_id)
+                registry.async_remove_device(device.id)
+
+        self.massage_sides.clear()
+        self.massage_sides.update(
+            {
+                bed.id: build_massage_sides(self.client, bed)
+                for bed in self.client.beds.values()
+            }
+        )
+
     @override
     async def _async_update_data(self) -> None:
+        await _gather([self._async_follow_the_account()])
+
         tasks: list[Coroutine[Any, Any, None]] = [self.client.fetch_bed_statuses()]
         tasks.extend(
             bed.foundation.update_foundation_status()
