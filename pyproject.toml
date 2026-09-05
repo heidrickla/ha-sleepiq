@@ -18,10 +18,11 @@ asyncio_mode = "auto"
 # `strict-typing` is the Platinum rule with teeth: Home Assistant runs mypy in
 # strict mode over integrations that claim it. The settings below mirror the
 # strict block core applies to a strict-typed integration, with nothing
-# relaxed. Without Home Assistant installed every class it exports is Any and a
-# local run reports subclassing Any and untyped decorators; that run is not the
-# check. The GitHub Tests job runs this configuration with Home Assistant
-# installed, and that run is.
+# relaxed and no per-module allowance for the component or its library: every
+# name is imported from the module that defines it, because neither
+# asyncsleepiq nor homeassistant.components.light re-exports explicitly and
+# strict mode is right to say so. The GitHub Tests job runs this with Home
+# Assistant installed, which is the run that counts.
 [tool.mypy]
 python_version = "3.14"
 strict = true
@@ -33,23 +34,8 @@ ignore_missing_imports = true
 follow_imports = "silent"
 
 [[tool.mypy.overrides]]
-# asyncsleepiq publishes its names by importing them in __init__.py without an
-# __all__. Core's mypy sees the same library and accepts the imports because
-# its strict block applies to component modules only; this override gives the
-# library the same treatment here so the vendored core files stay untouched.
-module = "asyncsleepiq.*"
-implicit_reexport = true
-
-[[tool.mypy.overrides]]
-# The vendored light.py imports ColorMode from homeassistant.components.light,
-# which re-exports it from its const module without an __all__ - Home
-# Assistant's own import style, byte-identical to core. Core's mypy accepts it
-# because its strict block is scoped to the component; this override scopes
-# the same allowance to that one module so the vendored file stays untouched.
-module = "homeassistant.components.light"
-implicit_reexport = true
-
-[[tool.mypy.overrides]]
+# The tests are not the integration. The Tests job runs mypy over
+# custom_components/sleepiq, where this block has no effect at all.
 module = "tests.*"
 strict = false
 disallow_untyped_defs = false

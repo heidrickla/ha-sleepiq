@@ -6,8 +6,9 @@ consistency that nothing else checks: the vendored core files against their
 recorded upstream hashes, translation keys against icons and names, exceptions
 raised against exceptions declared, user-facing exceptions raised without a
 translation key, the version fields against each other, the quality scale
-against the pinned rule list. Run it before a push so the push is not the
-first verification.
+against the pinned rule list, and every rule marked `done` against the file
+set that would have to exist for it to be true. Run it before a push so the
+push is not the first verification.
 
     python tools/validate_local.py
 """
@@ -210,6 +211,94 @@ def baseline() -> tuple[dict[str, str], set[str]]:
     return hashes, modified
 
 
+def missing_evidence(manifest: dict[str, Any]) -> dict[str, str]:
+    """Rules whose mechanism is not in the files, with what is missing.
+
+    Only the rules that leave a mark a script can see are listed here; the
+    rest are judgement and live in the yaml's comments. A rule in this dict
+    may not be filed `done`.
+    """
+    component = {
+        f: read(COMP, f) for f in sorted(os.listdir(COMP)) if f.endswith(".py")
+    }
+    everything = "\n".join(component.values())
+    flow = component["config_flow.py"]
+    coordinator = component["coordinator.py"]
+    tests_workflow = read(ROOT, ".github", "workflows", "tests.yml")
+    pyproject = read(ROOT, "pyproject.toml")
+
+    missing: dict[str, str] = {}
+
+    def want(rule: str, ok: bool, message: str) -> None:
+        if not ok:
+            missing[rule] = message
+
+    want(
+        "discovery",
+        not set(manifest) & {"dhcp", "zeroconf", "ssdp", "bluetooth", "usb"}
+        or any(f"async_step_{k}" in flow for k in ("dhcp", "zeroconf", "ssdp", "usb")),
+        "the manifest matches a discovery but the flow has no step for it",
+    )
+    want(
+        "reconfiguration-flow",
+        "async_step_reconfigure" in flow,
+        "config_flow.py has no async_step_reconfigure",
+    )
+    want(
+        "reauthentication-flow",
+        "async_step_reauth" in flow,
+        "config_flow.py has no async_step_reauth",
+    )
+    want(
+        "repair-issues",
+        "async_create_issue" in everything,
+        "nothing raises a repair issue",
+    )
+    want(
+        "dynamic-devices",
+        "async_add_listener" in everything,
+        "no platform listens for devices added after setup",
+    )
+    want(
+        "stale-devices",
+        "async_remove_device" in coordinator
+        or "async_remove_config_entry_device" in everything,
+        "nothing removes a device that has left the account",
+    )
+    want(
+        "diagnostics",
+        os.path.isfile(os.path.join(COMP, "diagnostics.py")),
+        "there is no diagnostics.py",
+    )
+    want(
+        "has-entity-name",
+        "_attr_has_entity_name = True" in everything,
+        "no entity sets _attr_has_entity_name",
+    )
+    want(
+        "icon-translations",
+        os.path.isfile(os.path.join(COMP, "icons.json"))
+        and "_attr_icon" not in everything,
+        "icons.json is missing or an _attr_icon overrides it",
+    )
+    want(
+        "parallel-updates",
+        all("PARALLEL_UPDATES" in component[f"{p}.py"] for p in PLATFORMS),
+        "a platform does not set PARALLEL_UPDATES",
+    )
+    want(
+        "test-coverage",
+        "--cov-fail-under=95" in tests_workflow,
+        "the Tests workflow does not gate coverage at 95%",
+    )
+    want(
+        "strict-typing",
+        "strict = true" in pyproject and "\nimplicit_reexport" not in pyproject,
+        "mypy is not strict, or a module override re-allows implicit re-export",
+    )
+    return missing
+
+
 def main() -> int:
     manifest = read_json(COMP, "manifest.json")
     const_src = read(COMP, "const.py")
@@ -333,33 +422,36 @@ def main() -> int:
             )
             if todo:
                 notes.append(f"quality scale still todo: {', '.join(todo)}")
+
+            # A rule filed `done` has to be visible in the files. This is the
+            # check that stops the yaml drifting back into a claim: it fails
+            # when a rule says done and the mechanism it needs is absent.
+            for rule, message in sorted(missing_evidence(manifest).items()):
+                status = declared.get(rule)
+                status = status.get("status") if isinstance(status, dict) else status
+                check(status != "done", f"{rule}: filed done but {message}")
         except ImportError:
             notes.append("PyYAML not installed - quality_scale.yaml not parsed")
 
-    # ------------------------------------------------------ icon translations
-    # The massage entities are this project's own: each needs an icon and a
-    # translated name. The vendored core entities keep core's hard-coded names
-    # and icons (has-entity-name and icon-translations are todo for them), so
-    # for those only orphaned translations are an error - a key in icons.json
-    # or strings.json that no platform uses.
+    # ------------------------------------------ entity and icon translations
+    # Every entity in this integration is named from strings.json through a
+    # translation key, so: no key may be declared that no platform mentions,
+    # and every key a platform mentions must have a name. Keys reach a platform
+    # three ways - a literal, a constant imported from const.py, and a lookup
+    # table - so a key counts as used when the platform's source contains the
+    # literal or names the constant that holds it.
     icons = read_json(COMP, "icons.json")
-    key_re = re.compile(r'(?:_attr_translation_key\s*=|\btranslation_key=)\s*"([^"]+)"')
     exc_re = re.compile(r'translation_domain=DOMAIN,\s*translation_key="([^"]+)"')
-    massage_keys = constants(const_src, "MASSAGE_")
-    owned_keys = {
-        "select": {
-            massage_keys["MASSAGE_MODE"],
-            massage_keys["MASSAGE_FOOT_SPEED"],
-            massage_keys["MASSAGE_HEAD_SPEED"],
-        },
-        "number": {massage_keys["MASSAGE_TIMER"]},
-    }
+    const_values = constants(const_src, "")
     for platform in PLATFORMS:
         source = read(COMP, f"{platform}.py")
-        used = set(key_re.findall(source)) - set(exc_re.findall(source))
-        # The speed selects take their key as a constructor argument; count
-        # every massage constant the platform names as used.
-        used |= {v for k, v in massage_keys.items() if k in source}
+        used = {
+            node.value
+            for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+        used -= set(exc_re.findall(source))
+        used |= {v for k, v in const_values.items() if k in source}
         declared_icons = set(icons.get("entity", {}).get(platform, {}))
         named = set(strings.get("entity", {}).get(platform, {}))
         check(
@@ -370,8 +462,7 @@ def main() -> int:
             named <= used,
             f"{platform}: strings.json has unused keys {sorted(named - used)}",
         )
-        for key in sorted(owned_keys.get(platform, set())):
-            check(key in declared_icons, f"{platform}: {key} has no icon in icons.json")
+        for key in sorted(declared_icons | named):
             check(
                 bool(
                     strings.get("entity", {}).get(platform, {}).get(key, {}).get("name")
@@ -385,10 +476,16 @@ def main() -> int:
     # component - setup and poll failures in __init__.py and coordinator.py
     # included, since those show on the integration card.
     raised: set[str] = set()
+    literals: set[str] = set()
     for f in sorted(os.listdir(COMP)):
         if f.endswith(".py"):
             source = read(COMP, f)
             raised |= set(exc_re.findall(source))
+            literals |= {
+                node.value
+                for node in ast.walk(ast.parse(source))
+                if isinstance(node, ast.Constant) and isinstance(node.value, str)
+            }
             for message in untranslated_raises(source, f):
                 failures.append(message)
     declared_exc = set(strings.get("exceptions", {}))
@@ -396,9 +493,12 @@ def main() -> int:
         raised <= declared_exc,
         f"code raises undeclared exception keys {sorted(raised - declared_exc)}",
     )
+    # Some keys reach the raise through the shared write helper rather than a
+    # literal at the raise itself, so an unused declaration is one whose key
+    # appears nowhere in the component at all.
     check(
-        declared_exc <= raised,
-        f"strings.json declares unused exceptions {sorted(declared_exc - raised)}",
+        declared_exc <= literals,
+        f"strings.json declares unused exceptions {sorted(declared_exc - literals)}",
     )
 
     # ----------------------------------------------------- issue translations
@@ -413,19 +513,31 @@ def main() -> int:
     # ------------------------------------------------------------ platforms
     init_src = read(COMP, "__init__.py")
     for platform in PLATFORMS:
+        source = read(COMP, f"{platform}.py")
         check(
             f"Platform.{platform.upper()}" in init_src,
             f"{platform}.py exists but Platform.{platform.upper()} is not forwarded",
         )
-        if "PARALLEL_UPDATES" not in read(COMP, f"{platform}.py"):
-            # Owned platforms must set it; vendored ones inherit core's omission
-            # and are recorded as todo under parallel-updates.
-            if f"{platform}.py" in modified:
-                failures.append(f"{platform}.py does not set PARALLEL_UPDATES")
-            else:
-                notes.append(
-                    f"{platform}.py (core sleepiq) does not set PARALLEL_UPDATES"
-                )
+        # Every platform here is forked from core and owned, so every one of
+        # them declares its own limit rather than inheriting core's omission.
+        check(
+            "PARALLEL_UPDATES" in source,
+            f"{platform}.py does not set PARALLEL_UPDATES",
+        )
+
+    # ------------------------------------------------- naming and icon source
+    # A hard-coded _attr_name defeats the translated name and a hard-coded
+    # _attr_icon defeats icons.json; both were the whole point of the fork.
+    for f in sorted(os.listdir(COMP)):
+        if not f.endswith(".py"):
+            continue
+        source = read(COMP, f)
+        check("_attr_name" not in source, f"{f}: sets _attr_name; name it in strings")
+        check("_attr_icon" not in source, f"{f}: sets _attr_icon; put it in icons.json")
+    check(
+        "_attr_has_entity_name = True" in read(COMP, "entity.py"),
+        "entity.py: the base classes must set _attr_has_entity_name",
+    )
 
     # ---------------------------------------------------------- syntax
     for dirpath, _dirs, files in os.walk(COMP):
