@@ -23,13 +23,7 @@ from .const import (
     PRESET,
 )
 from .coordinator import SleepIQConfigEntry, SleepIQDataUpdateCoordinator
-from .entity import (
-    SleepIQBedEntity,
-    SleepIQSleeperEntity,
-    async_add_beds,
-    async_write_to_bed,
-    sleeper_for_side,
-)
+from .entity import SleepIQBedEntity, async_add_beds, async_write_to_bed
 from .massage import SleepIQMassage, side_label
 
 # Every select writes to the bed; the cloud API is happiest with one request
@@ -120,9 +114,15 @@ class SleepIQSelectEntity(SleepIQBedEntity[SleepIQDataUpdateCoordinator], Select
 
 
 class SleepIQFootWarmingTempSelectEntity(
-    SleepIQSleeperEntity[SleepIQDataUpdateCoordinator], SelectEntity
+    SleepIQBedEntity[SleepIQDataUpdateCoordinator], SelectEntity
 ):
-    """Representation of a SleepIQ foot warming temperature select entity."""
+    """Representation of a SleepIQ foot warming temperature select entity.
+
+    Keyed on the bed and the physical side, like the foot warming timer number
+    beside it. Core keys this one on the sleeper, which collides on a bed where
+    only one side has a sleeper registered: both warmers resolve to that
+    sleeper and Home Assistant drops the second entity.
+    """
 
     _attr_options = [e.name.lower() for e in FootWarmingTemps]
     _attr_translation_key = "foot_warmer_temp"
@@ -135,10 +135,11 @@ class SleepIQFootWarmingTempSelectEntity(
     ) -> None:
         """Initialize the select entity."""
         self.foot_warmer = foot_warmer
-        sleeper = sleeper_for_side(bed, foot_warmer.side)
-        super().__init__(
-            coordinator, bed, sleeper, FOOT_WARMER, side_label(bed, foot_warmer.side)
-        )
+        self._attr_translation_placeholders = {
+            "sleeper": side_label(bed, foot_warmer.side)
+        }
+        self._attr_unique_id = f"{bed.id}_{foot_warmer.side.value}_{FOOT_WARMER}"
+        super().__init__(coordinator, bed)
         self._async_update_attrs()
 
     @callback
@@ -167,9 +168,13 @@ class SleepIQFootWarmingTempSelectEntity(
 
 
 class SleepIQCoreTempSelectEntity(
-    SleepIQSleeperEntity[SleepIQDataUpdateCoordinator], SelectEntity
+    SleepIQBedEntity[SleepIQDataUpdateCoordinator], SelectEntity
 ):
-    """Representation of a SleepIQ core climate temperature select entity."""
+    """Representation of a SleepIQ core climate temperature select entity.
+
+    Keyed on the bed and the physical side, for the same reason as the foot
+    warmer above.
+    """
 
     # Maps to translate between asyncsleepiq and HA's naming preference
     SLEEPIQ_TO_HA_CORE_TEMP_MAP = {
@@ -194,10 +199,11 @@ class SleepIQCoreTempSelectEntity(
     ) -> None:
         """Initialize the select entity."""
         self.core_climate = core_climate
-        sleeper = sleeper_for_side(bed, core_climate.side)
-        super().__init__(
-            coordinator, bed, sleeper, CORE_CLIMATE, side_label(bed, core_climate.side)
-        )
+        self._attr_translation_placeholders = {
+            "sleeper": side_label(bed, core_climate.side)
+        }
+        self._attr_unique_id = f"{bed.id}_{core_climate.side.value}_{CORE_CLIMATE}"
+        super().__init__(coordinator, bed)
         self._async_update_attrs()
 
     @callback

@@ -75,9 +75,9 @@ def side_label(bed: SleepIQBed, side: Side) -> str:
 
     The sleeper's first name when someone sleeps on that side, otherwise the
     physical side. "Lewis massage mode" is what someone reaches for; "Right
-    massage mode" makes them work out which side they are. Unlike core's
-    sleeper_for_side() this never falls back to the first sleeper, so a bed
-    with one sleeper still gets two distinctly named sides.
+    massage mode" makes them work out which side they are. Unlike core, this
+    never falls back to the first sleeper, so a bed where only one side has a
+    sleeper still gets two distinctly named sides.
     """
     for sleeper in bed.sleepers:
         if sleeper.side == side and sleeper.name:

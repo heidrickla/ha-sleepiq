@@ -18,11 +18,11 @@ from .conftest import (
     BED_NAME,
     BED_NAME_LOWER,
     PRESET_STATE,
-    SLEEPER_L_ID,
     SLEEPER_L_NAME,
     SLEEPER_L_NAME_LOWER,
-    SLEEPER_R_ID,
     SLEEPER_R_NAME_LOWER,
+    make_core_climate,
+    make_foot_warmer,
     setup_platform,
 )
 
@@ -58,7 +58,7 @@ async def test_the_selects_are_named_and_keyed(
         f"{BED_NAME} {SLEEPER_L_NAME} foot warmer"
     )
     assert entity_registry.async_get(FOOT_WARMER).unique_id == (
-        f"{SLEEPER_L_ID}_foot_warmer"
+        f"{BED_ID}_{Side.LEFT.value}_foot_warmer"
     )
 
     climate = hass.states.get(CORE_CLIMATE)
@@ -67,8 +67,50 @@ async def test_the_selects_are_named_and_keyed(
         f"{BED_NAME} Sleeper R core climate"
     )
     assert entity_registry.async_get(CORE_CLIMATE).unique_id == (
-        f"{SLEEPER_R_ID}_core_climate"
+        f"{BED_ID}_{Side.RIGHT.value}_core_climate"
     )
+
+
+async def test_a_bed_with_one_sleeper_gets_both_sides_of_the_comfort_hardware(
+    hass: HomeAssistant, entity_registry: er.EntityRegistry, mock_asyncsleepiq, mock_bed
+) -> None:
+    """The side with nobody on it is a side, not a copy of the other one.
+
+    Core keys these two on the sleeper, and a side with no sleeper registered
+    falls back to the first one, so both sides ask for the same unique id and
+    Home Assistant keeps only the first entity. Keyed on the bed and the side,
+    the bed gets all four.
+    """
+    mock_bed.sleepers = [mock_bed.sleepers[0]]
+    mock_bed.foundation.foot_warmers = [
+        make_foot_warmer(Side.LEFT),
+        make_foot_warmer(Side.RIGHT),
+    ]
+    mock_bed.foundation.core_climates = [
+        make_core_climate(Side.LEFT),
+        make_core_climate(Side.RIGHT),
+    ]
+
+    await setup_platform(hass, [SELECT_DOMAIN])
+
+    expected = {
+        f"select.{BED_NAME_LOWER}_{SLEEPER_L_NAME_LOWER}_foot_warmer": (
+            f"{BED_ID}_{Side.LEFT.value}_foot_warmer"
+        ),
+        f"select.{BED_NAME_LOWER}_right_foot_warmer": (
+            f"{BED_ID}_{Side.RIGHT.value}_foot_warmer"
+        ),
+        f"select.{BED_NAME_LOWER}_{SLEEPER_L_NAME_LOWER}_core_climate": (
+            f"{BED_ID}_{Side.LEFT.value}_core_climate"
+        ),
+        f"select.{BED_NAME_LOWER}_right_core_climate": (
+            f"{BED_ID}_{Side.RIGHT.value}_core_climate"
+        ),
+    }
+    for entity_id, unique_id in expected.items():
+        assert hass.states.get(entity_id) is not None, entity_id
+        assert entity_registry.async_get(entity_id).unique_id == unique_id
+    assert len(set(expected.values())) == len(expected)
 
 
 async def test_a_split_foundation_names_its_presets_by_side(

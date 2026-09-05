@@ -26,8 +26,9 @@ escape. Every name is also imported from the module that defines it, because
 mypy in strict mode does not accept either library's implicit re-exports.
 
   * __init__.py      - build massage objects during setup, translated setup
-                       exceptions, migration of massage unique ids, a repair
-                       issue when the deprecated YAML block is imported
+                       exceptions, migration of every per-side unique id from
+                       the sleeper to the side, a repair issue when the
+                       deprecated YAML block is imported
   * binary_sensor.py - has_entity_name and a translated name, icons.json,
                        PARALLEL_UPDATES, entities added for beds found later
   * button.py        - translated names, icons.json, PARALLEL_UPDATES,
@@ -44,7 +45,9 @@ mypy in strict mode does not accept either library's implicit re-exports.
                        removed
   * entity.py        - has_entity_name on the base classes, the bed id as a
                        device identifier, the shared write helper, the helper
-                       that adds a later bed's entities
+                       that adds a later bed's entities; core's sleeper_for_side
+                       fallback removed, because per-side hardware is keyed on
+                       the side
   * light.py         - translated name per outlet, PARALLEL_UPDATES,
                        translated write failures
   * number.py        - massage timer number entity, translated names per side
@@ -52,7 +55,9 @@ mypy in strict mode does not accept either library's implicit re-exports.
                        failures
   * select.py        - massage mode and head/foot speed select entities,
                        translated names, icons.json, PARALLEL_UPDATES,
-                       translated write failures
+                       translated write failures, the foot warmer and core
+                       climate selects keyed on the bed and the side rather
+                       than on the sleeper
   * sensor.py        - translated names per sleeper, icons.json
   * switch.py        - translated name, icons.json, PARALLEL_UPDATES,
                        translated write failures

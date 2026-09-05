@@ -24,7 +24,9 @@ from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
+    CORE_CLIMATE,
     DOMAIN,
+    FOOT_WARMER,
     IS_IN_BED,
     ISSUE_DEPRECATED_YAML,
     MASSAGE_FOOT_SPEED,
@@ -133,7 +135,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SleepIQConfigEntry) -> b
     }
 
     await _async_migrate_unique_ids(hass, entry, gateway)
-    await _async_migrate_massage_unique_ids(hass, entry, gateway)
+    await _async_migrate_side_keyed_unique_ids(hass, entry, gateway)
 
     coordinator = SleepIQDataUpdateCoordinator(hass, entry, gateway, massage_sides)
     pause_coordinator = SleepIQPauseUpdateCoordinator(hass, entry, gateway)
@@ -207,20 +209,26 @@ async def _async_migrate_unique_ids(
     await er.async_migrate_entries(hass, entry.entry_id, _async_migrator)
 
 
-async def _async_migrate_massage_unique_ids(
+async def _async_migrate_side_keyed_unique_ids(
     hass: HomeAssistant, entry: ConfigEntry, gateway: AsyncSleepIQ
 ) -> None:
-    """Move massage entities from sleeper-keyed to side-keyed unique ids.
+    """Move per-side entities from sleeper-keyed to side-keyed unique ids.
 
-    The first release keyed them {sleeper_id}_{type}, which collides on a bed
-    with one sleeper because both sides resolved to that sleeper. They are now
-    {bed_id}_{side}_{type}, like core's foot warmer and core climate entities.
+    Hardware that exists once per side was keyed {sleeper_id}_{type}: the
+    massage entities in this project's first release, and the foot warmer and
+    core climate selects in core's own sleepiq. Both collide on a bed where only
+    one side has a sleeper registered, because the side with nobody on it falls
+    back to the first sleeper and Home Assistant then drops the second entity.
+    They are now {bed_id}_{side}_{type}, like the foot warming and core climate
+    timer numbers beside them.
     """
-    massage_types = (
+    side_keyed_types = (
         MASSAGE_MODE,
         MASSAGE_FOOT_SPEED,
         MASSAGE_HEAD_SPEED,
         MASSAGE_TIMER,
+        FOOT_WARMER,
+        CORE_CLIMATE,
     )
     sleeper_sides = {
         sleeper.sleeper_id: (bed.id, sleeper.side.value)
@@ -231,14 +239,14 @@ async def _async_migrate_massage_unique_ids(
     @callback
     def _async_migrator(entity_entry: er.RegistryEntry) -> dict[str, Any] | None:
         old_unique_id = entity_entry.unique_id
-        for massage_type in massage_types:
-            if not old_unique_id.endswith(f"_{massage_type}"):
+        for entity_type in side_keyed_types:
+            if not old_unique_id.endswith(f"_{entity_type}"):
                 continue
-            sleeper_id = old_unique_id.removesuffix(f"_{massage_type}")
+            sleeper_id = old_unique_id.removesuffix(f"_{entity_type}")
             if (found := sleeper_sides.get(sleeper_id)) is None:
                 return None
             bed_id, side = found
-            new_unique_id = f"{bed_id}_{side}_{massage_type}"
+            new_unique_id = f"{bed_id}_{side}_{entity_type}"
             _LOGGER.debug(
                 "Migrating unique_id from [%s] to [%s]", old_unique_id, new_unique_id
             )

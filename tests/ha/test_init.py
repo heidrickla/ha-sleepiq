@@ -4,8 +4,10 @@ Vendored from core's tests/components/sleepiq/test_init.py at tag 2026.8.2
 where it applies, plus what this repository adds on top: a login failure
 during a poll starts reauth instead of logging a traceback every minute, the
 account's bed list is followed as beds are added and removed, the YAML block
-raises a repair issue, and massage entities created under the sleeper-keyed
-unique ids of the first release are migrated to side-keyed ones.
+raises a repair issue, and entities that exist once per side but were created
+under a sleeper-keyed unique id - this project's first massage release, and
+core's own foot warmer and core climate selects - are migrated to side-keyed
+ones.
 """
 
 from unittest.mock import MagicMock, patch
@@ -31,7 +33,10 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from custom_components.sleepiq.const import (
+    CORE_CLIMATE,
     DOMAIN,
+    FOOT_WARMER,
+    FOOT_WARMING_TIMER,
     IS_IN_BED,
     ISSUE_DEPRECATED_YAML,
     MASSAGE_MODE,
@@ -49,6 +54,7 @@ from .conftest import (
     SLEEPER_L_ID,
     SLEEPER_L_NAME,
     SLEEPER_L_NAME_LOWER,
+    SLEEPER_R_ID,
     SLEEPIQ_CONFIG,
     make_bed,
     massage_reads,
@@ -423,3 +429,59 @@ async def test_massage_unique_ids_move_from_the_sleeper_to_the_side(
     assert hass.states.get("select.old_mode").state == "off"
     assert hass.states.get("number.old_timer").state == "12.0"
     assert hass.states.get(MODE_L) is None
+
+
+async def test_comfort_select_unique_ids_move_from_the_sleeper_to_the_side(
+    hass: HomeAssistant, entity_registry: er.EntityRegistry, mock_asyncsleepiq
+) -> None:
+    """The foot warmer and core climate selects are keyed on the side now.
+
+    Core keys them on the sleeper, which collides on a bed where only one side
+    has a sleeper registered. An entity installed under core's id keeps its
+    entity id and its history.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=SLEEPIQ_CONFIG,
+        unique_id=SLEEPIQ_CONFIG[CONF_USERNAME].lower(),
+    )
+    entry.add_to_hass(hass)
+    entity_registry.async_get_or_create(
+        "select",
+        DOMAIN,
+        f"{SLEEPER_L_ID}_{FOOT_WARMER}",
+        suggested_object_id="old_warmer",
+        config_entry=entry,
+    )
+    entity_registry.async_get_or_create(
+        "select",
+        DOMAIN,
+        f"{SLEEPER_R_ID}_{CORE_CLIMATE}",
+        suggested_object_id="old_climate",
+        config_entry=entry,
+    )
+    # The timer numbers were keyed on the side already and must not move.
+    entity_registry.async_get_or_create(
+        "number",
+        DOMAIN,
+        f"{BED_ID}_L_{FOOT_WARMING_TIMER}",
+        suggested_object_id="warmer_timer",
+        config_entry=entry,
+    )
+
+    with patch("custom_components.sleepiq.PLATFORMS", ["select", "number"]):
+        assert await async_setup_component(hass, DOMAIN, {})
+    await hass.async_block_till_done()
+
+    assert entity_registry.async_get("select.old_warmer").unique_id == (
+        f"{BED_ID}_L_{FOOT_WARMER}"
+    )
+    assert entity_registry.async_get("select.old_climate").unique_id == (
+        f"{BED_ID}_R_{CORE_CLIMATE}"
+    )
+    assert entity_registry.async_get("number.warmer_timer").unique_id == (
+        f"{BED_ID}_L_{FOOT_WARMING_TIMER}"
+    )
+    # The migrated entities are the live ones, not orphans beside new copies.
+    assert hass.states.get("select.old_warmer").state == "off"
+    assert hass.states.get("select.old_climate").state == "off"

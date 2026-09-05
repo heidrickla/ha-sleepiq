@@ -5,7 +5,6 @@ from collections.abc import Callable, Coroutine, Sequence
 from typing import Any, override
 
 from asyncsleepiq.bed import SleepIQBed
-from asyncsleepiq.consts import Side
 from asyncsleepiq.exceptions import (
     SleepIQAPIException,
     SleepIQLoginException,
@@ -50,14 +49,6 @@ def device_from_bed(bed: SleepIQBed) -> DeviceInfo:
         name=bed.name,
         model=bed.model,
     )
-
-
-def sleeper_for_side(bed: SleepIQBed, side: Side) -> SleepIQSleeper:
-    """Find the sleeper for a side or the first sleeper."""
-    for sleeper in bed.sleepers:
-        if sleeper.side == side:
-            return sleeper
-    return bed.sleepers[0]
 
 
 def sleeper_label(bed: SleepIQBed, sleeper: SleepIQSleeper) -> str:
@@ -180,18 +171,16 @@ class SleepIQSleeperEntity[_SleepIQCoordinatorT: _DataCoordinatorType](
         bed: SleepIQBed,
         sleeper: SleepIQSleeper,
         name: str,
-        label: str | None = None,
     ) -> None:
         """Initialize the SleepIQ sensor entity.
 
-        The name is the entity type and keys the unique id. The label is the
-        word the translated name puts in front of it: the sleeper's own by
-        default, and the physical side for hardware that is keyed on the side.
+        This is for what a sleeper has, not for what a side of the bed has: the
+        unique id is the sleeper's, so hardware that exists per side is keyed on
+        the bed and the side instead. The name is the entity type and the
+        translated name puts the sleeper's own word in front of it.
         """
         self.sleeper = sleeper
         super().__init__(coordinator, bed)
 
-        self._attr_translation_placeholders = {
-            "sleeper": label if label is not None else sleeper_label(bed, sleeper)
-        }
+        self._attr_translation_placeholders = {"sleeper": sleeper_label(bed, sleeper)}
         self._attr_unique_id = f"{sleeper.sleeper_id}_{name}"

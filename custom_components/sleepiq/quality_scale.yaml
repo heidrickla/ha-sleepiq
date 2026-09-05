@@ -70,11 +70,18 @@ rules:
   entity-unique-id:
     status: done
     comment: |
-      Massage entities are keyed on bed id and physical side, like core's foot
-      warmer and core climate entities, so a bed with one sleeper gets two
-      distinct sides. Entities created by the first release under the
-      sleeper-keyed id are migrated at setup. Every other unique id is core's
-      and is unchanged, so no installed entity was renamed by the fork.
+      Everything the bed has once per side - the massage entities, the foot
+      warmer and core climate selects - is keyed on bed id and physical side,
+      like the foot warming and core climate timer numbers. Core keys the two
+      selects on the sleeper instead, which collides on a bed where only one
+      side has a sleeper registered: the empty side falls back to the first
+      sleeper and Home Assistant drops the second entity. Fixing that is a
+      deliberate divergence from core, so entities installed under either the
+      first release's massage ids or core's select ids are migrated at setup
+      and keep their entity ids and history; README says what the divergence
+      costs if core's integration takes over again. Every other unique id is
+      core's and is unchanged. Both migrations and the one-sleeper bed are
+      tested.
   has-entity-name:
     status: done
     comment: |
