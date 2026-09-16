@@ -21,26 +21,45 @@ addopts = "-p tests.winposix"
 asyncio_mode = "auto"
 
 # `strict-typing` is the Platinum rule with teeth: Home Assistant runs mypy in
-# strict mode over integrations that claim it. The settings below mirror the
-# strict block core applies to a strict-typed integration, with nothing
-# relaxed and no per-module allowance for the component or its library: every
-# name is imported from the module that defines it, because neither
-# asyncsleepiq nor homeassistant.components.light re-exports explicitly. The
-# GitHub Tests job runs this with Home Assistant installed, which is the run
-# that counts.
+# strict mode over integrations that claim it. This is core's generated
+# mypy.ini [mypy] block at 2026.8.3 plus `strict`, which covers the flags core
+# lists individually and adds no_implicit_reexport and disallow_any_generics,
+# which core grants per module and a custom integration is not in the namespace
+# for. Dropped from core's block: plugins, native_parser and num_workers, which
+# are core-tree settings, and warn_incomplete_stub, because core type-checks its
+# own stubs. Nothing is relaxed for the component or its library: every name is
+# imported from the module that defines it, because neither asyncsleepiq nor
+# homeassistant.components.light re-exports explicitly. The GitHub Tests job
+# runs this with Home Assistant installed, which is the run that counts.
 [tool.mypy]
 python_version = "3.14"
+platform = "linux"
 strict = true
-warn_return_any = true
-disallow_untyped_defs = true
-disallow_any_generics = true
-no_implicit_reexport = true
-ignore_missing_imports = true
-follow_imports = "silent"
+local_partial_types = true
+no_implicit_optional = true
+strict_bytes = true
+warn_unreachable = true
+extra_checks = false
+enable_error_code = [
+    "deprecated",
+    "explicit-override",
+    "ignore-without-code",
+    "redundant-self",
+    "truthy-iterable",
+]
+disable_error_code = ["annotation-unchecked", "import-not-found", "import-untyped"]
+follow_imports = "normal"
+show_error_codes = true
 
 [[tool.mypy.overrides]]
 # The tests are not the integration. The Tests job runs mypy over
 # custom_components/sleepiq_massage, where this block has no effect at all.
+# `strict = false` does not belong here: mypy 1.18.2 accepts it in a per-module
+# section without a warning and then discards the whole section, taking the
+# relaxations beside it with it.
 module = "tests.*"
-strict = false
 disallow_untyped_defs = false
+disallow_untyped_calls = false
+disallow_incomplete_defs = false
+disallow_any_generics = false
+warn_return_any = false
