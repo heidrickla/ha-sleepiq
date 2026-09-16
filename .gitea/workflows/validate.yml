@@ -1,17 +1,9 @@
 name: Validate
 
-# Runs on a self-hosted act_runner, not GitHub-hosted runners -
-# GitHub Actions minutes are a budget line and this hardware is already paid for.
-#
-# THE RUNNER IS SHARED AND ITS CAPACITY IS 1. Other agent sessions queue behind
-# anything pushed here, so the per-push job is deliberately ONE fast job. The
-# slow Home Assistant actions are workflow_dispatch only - available on demand,
-# never occupying the shared runner on every commit. The Home Assistant test
-# harness, mypy and the offline validator run in the GitHub Tests workflow,
-# which is gated to GitHub and skips here.
-# (Capacity >1 was tried on 2026-08-25 and act_runner v0.6.1 corrupted job
-# contexts - un-interpolated matrix vars and cross-job workspace lstat - so 1 is
-# the known-good setting. Do not raise it to make this faster.)
+# The per-push job is one fast job. The slow Home Assistant actions are
+# workflow_dispatch only. The Home Assistant test harness, mypy and the offline
+# validator run in the GitHub Tests workflow, which is gated to GitHub and
+# skips here.
 
 on:
   push:
@@ -145,8 +137,8 @@ jobs:
           print(f"{len(rules)} rules; still todo: {', '.join(todo) or 'none'}")
           PY
 
-  # Slow, and depend on fetching third-party actions. Manual only, so they never
-  # hold the shared single-capacity runner on an ordinary push.
+  # Slow, and depend on fetching third-party actions. Manual only, so an
+  # ordinary push stays fast.
   home-assistant:
     name: hassfest + HACS
     if: github.event_name == 'workflow_dispatch'
