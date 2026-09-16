@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install ruff (PINNED)
+      - name: Install ruff
         # Pinned deliberately. An unpinned linter makes CI non-reproducible:
         # this job passed locally and failed in CI purely because pip fetched a
         # newer ruff whose default rules differed from the local install.
