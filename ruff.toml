@@ -10,7 +10,6 @@
 # reviewable diff. Re-sorting their imports would break every one of those
 # hashes and make future syncs materially harder, in exchange for nothing.
 #
-# So: adopt core's isort settings rather than fight them.
 # Mirrors home-assistant/core pyproject.toml [tool.ruff.lint.isort].
 
 # The Tests job installs Python 3.14 and the mypy block pins python_version
