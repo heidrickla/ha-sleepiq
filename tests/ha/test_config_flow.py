@@ -5,6 +5,8 @@ Vendored from core's tests/components/sleepiq/test_config_flow.py at tag
 it, and every form with a password field is checked to mask it and not echo it.
 """
 
+import json
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from asyncsleepiq.exceptions import SleepIQLoginException, SleepIQTimeoutException
@@ -44,6 +46,16 @@ def _password_is_masked_and_not_echoed(result) -> None:
     assert validator.config["type"] == "password"
 
 
+def _declared_abort_reasons() -> set[str]:
+    """Abort reasons declared in both strings.json and translations/en.json."""
+    component = Path(__file__).parents[2] / "custom_components" / "sleepiq_massage"
+    declared = [
+        set(json.loads(path.read_text(encoding="utf-8"))["config"]["abort"])
+        for path in (component / "strings.json", component / "translations" / "en.json")
+    ]
+    return declared[0] & declared[1]
+
+
 # ------------------------------------------------------------------- import
 
 
@@ -60,10 +72,18 @@ async def test_import(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.parametrize(
-    "side_effect", [SleepIQLoginException, SleepIQTimeoutException]
+    ("side_effect", "reason"),
+    [
+        (SleepIQLoginException, "invalid_auth"),
+        (SleepIQTimeoutException, "cannot_connect"),
+    ],
 )
-async def test_import_failure(hass: HomeAssistant, side_effect) -> None:
-    """Test that we won't import a config entry on login failure."""
+async def test_import_failure(hass: HomeAssistant, side_effect, reason) -> None:
+    """A failed import creates no entry and aborts with a reason that has a string.
+
+    The abort reason is looked up under config.abort, not config.error, so a
+    reason declared only under error renders as an empty dialog.
+    """
     with patch(
         "asyncsleepiq.AsyncSleepIQ.login",
         side_effect=side_effect,
@@ -71,7 +91,16 @@ async def test_import_failure(hass: HomeAssistant, side_effect) -> None:
         assert await setup.async_setup_component(hass, DOMAIN, {DOMAIN: SLEEPIQ_CONFIG})
         await hass.async_block_till_done()
 
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": config_entries.SOURCE_IMPORT},
+            data=SLEEPIQ_CONFIG,
+        )
+
     assert len(hass.config_entries.async_entries(DOMAIN)) == 0
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == reason
+    assert reason in _declared_abort_reasons()
 
 
 # ---------------------------------------------------------------- discovery

@@ -2,6 +2,8 @@
   "config": {
     "abort": {
       "already_configured": "Account is already configured",
+      "cannot_connect": "Failed to connect to SleepIQ. The account in configuration.yaml was not imported.",
+      "invalid_auth": "Invalid authentication. The account in configuration.yaml was not imported.",
       "reauth_successful": "Re-authentication was successful",
       "reconfigure_successful": "Re-configuration was successful",
       "wrong_account": "That is a different SleepIQ account. Add it as its own entry instead."
