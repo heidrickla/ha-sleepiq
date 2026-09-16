@@ -6,9 +6,9 @@ the POSIX modules Home Assistant imports before any conftest is loaded; all
 three are needed for the suite to run there. They skip when the harness is
 absent, so the pure suite one level up still runs on a bare checkout.
 
-THIS CONFTEST LIVES IN ITS OWN DIRECTORY ON PURPOSE. Its autouse fixture pulls
-in Home Assistant machinery, and a conftest applies to everything at or below
-its directory; in tests/ it would attach to the pure tests and error them all.
+This conftest lives in its own directory because its autouse fixture pulls in
+Home Assistant machinery, and a conftest applies to everything at or below its
+directory; in tests/ it would attach to the pure tests and error them all.
 
 The bed fixtures follow core's tests/components/sleepiq/conftest.py at tag
 2026.8.2, cut down to what the vendored platforms need to load, plus a
