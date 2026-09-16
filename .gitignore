@@ -11,14 +11,3 @@ htmlcov/
 .idea/
 Thumbs.db
 .DS_Store
-
-# Local agent orientation docs - keep out of the repo
-CLAUDE.md
-AGENTS.md
-.cursorrules
-
-# Agent session config and hooks - machine-specific, never part of the project
-.claude/
-
-# Private operational notes (internal hosts, accounts, lab setup)
-docs/local/
