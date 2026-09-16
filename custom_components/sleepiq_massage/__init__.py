@@ -214,13 +214,17 @@ async def _async_migrate_side_keyed_unique_ids(
 ) -> None:
     """Move per-side entities from sleeper-keyed to side-keyed unique ids.
 
-    Hardware that exists once per side was keyed {sleeper_id}_{type}: the
-    massage entities in this project's first release, and the foot warmer and
-    core climate selects in core's own sleepiq. Both collide on a bed where only
-    one side has a sleeper registered, because the side with nobody on it falls
-    back to the first sleeper and Home Assistant then drops the second entity.
-    They are now {bed_id}_{side}_{type}, like the foot warming and core climate
+    Core's sleepiq keys hardware that exists once per side as
+    {sleeper_id}_{type}, which collides on a bed where only one side has a
+    sleeper registered: the side with nobody on it falls back to the first
+    sleeper and Home Assistant then drops the second entity. This integration
+    keys them {bed_id}_{side}_{type}, like the foot warming and core climate
     timer numbers beside them.
+
+    er.async_migrate_entries visits only this entry's own entities, so nothing
+    registered by core's sleepiq or by the 0.1.0 release under domain sleepiq
+    is in reach. No released version of sleepiq_massage wrote sleeper-keyed
+    ids; this guards a later change of scheme.
     """
     side_keyed_types = (
         MASSAGE_MODE,

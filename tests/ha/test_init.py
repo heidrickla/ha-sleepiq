@@ -333,7 +333,12 @@ async def test_no_yaml_no_repair_issue(
 async def test_unique_id_migration(
     hass: HomeAssistant, entity_registry: er.EntityRegistry, mock_asyncsleepiq
 ) -> None:
-    """Core's migration of the sensor unique ids still runs (core's own test)."""
+    """Core's sensor unique-id migrator still runs (core's own test).
+
+    The old ids are seeded on this integration's own entry.
+    er.async_migrate_entries visits only that entry's entities, so this drives
+    the migrator; it is not an upgrade from core's sleepiq.
+    """
     entry = MockConfigEntry(
         domain=DOMAIN,
         data=SLEEPIQ_CONFIG,
@@ -374,10 +379,15 @@ async def test_unique_id_migration(
     )
 
 
-async def test_massage_unique_ids_move_from_the_sleeper_to_the_side(
+async def test_the_side_keyed_migrator_rewrites_a_sleeper_keyed_id(
     hass: HomeAssistant, entity_registry: er.EntityRegistry, mock_asyncsleepiq
 ) -> None:
-    """An entity registered under the first release's id keeps its entity id."""
+    """A sleeper-keyed id on this integration's own entry moves to the side.
+
+    The ids are seeded here. er.async_migrate_entries visits only the entities
+    of the entry it is given, and no released version of sleepiq_massage wrote
+    sleeper-keyed ids, so this drives the migrator rather than an upgrade.
+    """
     entry = MockConfigEntry(
         domain=DOMAIN,
         data=SLEEPIQ_CONFIG,
