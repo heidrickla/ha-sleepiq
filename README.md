@@ -506,10 +506,12 @@ and the validator, on every push.
 
 ## Licence
 
-The project is MIT, in `LICENSE`. The files in
-`custom_components/sleepiq_massage/` are derived from Home Assistant core and
-remain under Apache-2.0, whose text is in `LICENSE-APACHE` and whose file-by-file
-record is in `NOTICE`.
+The project is MIT, in `LICENSE`. Most of `custom_components/sleepiq_massage/`
+is derived from Home Assistant core's `sleepiq` at tag 2026.8.2 and stays under
+Apache-2.0, whose text is in `docs/licenses/Apache-2.0.txt`. `massage.py`,
+`diagnostics.py`, `quality_scale.yaml` and `translations/` have no upstream
+counterpart and are MIT like the rest of the project; `NOTICE` carries the
+file-by-file split.
 
 ## Upstreaming
 

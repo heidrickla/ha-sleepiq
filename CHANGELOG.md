@@ -20,14 +20,19 @@ Newest first, in the style of
   side by side on the same account, with the second set's entity ids carrying a
   `_2` suffix. The deprecated YAML key moves with the domain, to
   `sleepiq_massage:`.
-- The project licence is MIT, in `LICENSE`. `custom_components/sleepiq_massage/`
-  is derived from Home Assistant core and remains Apache-2.0, whose text is now
-  in `LICENSE-APACHE` and whose file-by-file record is in `NOTICE`.
-- `hacs.json` declares `"country": ["US"]`. Sleep Number sells, delivers and
-  services only in the United States, and a smart bed can only be registered to
-  a SleepIQ account by its original purchaser, so there is no path to a working
-  login elsewhere. The key affects HACS store visibility and never an existing
-  install.
+- The project licence is MIT, in `LICENSE`. The files in
+  `custom_components/sleepiq_massage/` derived from Home Assistant core remain
+  Apache-2.0; `docs/licenses/Apache-2.0.txt` carries that text and `NOTICE` has
+  the file-by-file split, including the four added files, which are MIT. The
+  Apache text is not a second root `LICENSE-*` file because GitHub reports
+  NOASSERTION for a root with two licence-named files and HACS fails on that.
+- `hacs.json` declares `"country": ["US"]`. Sleep Number sold through 570-plus
+  stores in the United States and sleepnumber.com and nowhere else as of
+  2026-09-16. Sleep Country Canada acquired the business in July 2026 and has
+  named a Canadian rollout as an option with no date; when Sleep Number products
+  reach Sleep Country or Dormez-vous, add CA. The key hides the store listing
+  from HACS users who have set a different country, which defaults to ALL, and
+  never affects an existing install.
 
 ### Added
 
