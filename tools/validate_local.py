@@ -5,7 +5,8 @@ them that can be checked with no network at all, plus the cross-file
 consistency that nothing else checks: the vendored core files against their
 recorded upstream hashes, translation keys against icons and names, exceptions
 raised against exceptions declared, user-facing exceptions raised without a
-translation key, the version fields against each other, the quality scale
+translation key, the manifest's published URLs against private address space,
+the version fields against each other, the quality scale
 against the pinned rule list, and every rule marked `done` against the file
 set that would have to exist for it to be true. Run it before a push so the
 push is not the first verification.
@@ -17,11 +18,13 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import ipaddress
 import json
 import os
 import re
 import sys
 from typing import Any
+from urllib.parse import urlsplit
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 DOMAIN = "sleepiq_massage"
@@ -46,6 +49,12 @@ VALID_IOT_CLASS = {
     "local_push",
     "calculated",
 }
+
+# Manifest keys whose value is a URL a stranger has to be able to open. A
+# forge URL on the house LAN passes every syntactic check and reaches nobody
+# outside the house, so the address family is checked, not the spelling.
+MANIFEST_URL_KEYS = ("documentation", "issue_tracker")
+PRIVATE_HOST_SUFFIXES = (".local", ".lan", ".internal")
 
 # Pinned from developers.home-assistant.io/docs/core/integration-quality-scale/checklist
 # (checked 2026-09-02: 54 rules, none new or deprecated). The list is pinned
@@ -129,6 +138,34 @@ def read_json(*parts: str) -> Any:
 def check(condition: bool, message: str) -> None:
     if not condition:
         failures.append(message)
+
+
+def unreachable_host(url: str) -> str | None:
+    """The host of a URL nobody outside this network can open, or None.
+
+    Private and link-local literals, loopback, unique-local IPv6, the reserved
+    local suffixes, and a bare hostname with no dot: each resolves only inside
+    one network, so a user following the link gets nothing.
+    """
+    host = (urlsplit(url).hostname or "").strip().rstrip(".").lower()
+    if not host:
+        return None
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    else:
+        if (
+            address.is_private
+            or address.is_loopback
+            or address.is_link_local
+            or address.is_reserved
+        ):
+            return host
+        return None
+    if host == "localhost" or host.endswith(PRIVATE_HOST_SUFFIXES) or "." not in host:
+        return host
+    return None
 
 
 def constants(source: str, prefix: str) -> dict[str, str]:
@@ -327,6 +364,16 @@ def main() -> int:
         and all(c.startswith("@") for c in manifest["codeowners"]),
         "manifest codeowners entries must start with @",
     )
+    for key in MANIFEST_URL_KEYS:
+        url = manifest.get(key)
+        if not isinstance(url, str):
+            continue
+        host = unreachable_host(url)
+        check(
+            host is None,
+            f"manifest {key} host {host!r} is not reachable from outside this "
+            f"network - publish the URL a user can open",
+        )
     keys = list(manifest)
     check(
         keys[:2] == ["domain", "name"] and keys[2:] == sorted(keys[2:]),
