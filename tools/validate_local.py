@@ -433,6 +433,7 @@ def name_matcher(names: list[str]) -> Any:
 # --others adds a file created for this commit and not yet staged.
 PUBLISHED_SUFFIXES = {
     ".cfg",
+    ".html",
     ".ini",
     ".json",
     ".md",
@@ -827,6 +828,12 @@ def main() -> int:
     # A custom integration without a version silently fails to load - the
     # symptom is a missing integration, not an error.
     check(bool(manifest.get("version")), "manifest version is empty")
+    const_version = constants(const_src, "VERSION").get("VERSION")
+    check(
+        const_version == manifest.get("version"),
+        f"const.VERSION {const_version!r} != manifest version "
+        f"{manifest.get('version')!r} - HA reports one and HACS the other",
+    )
     project_version = pyproject_version()
     if project_version is not None:
         check(

@@ -3,6 +3,11 @@
 DATA_SLEEPIQ = "data_sleepiq"
 DOMAIN = "sleepiq_massage"
 
+# Must match manifest.json. HACS surfaces the release tag while Home Assistant
+# reports the manifest version, so a mismatch is a wrong version number on
+# screen. tools/validate_local.py refuses one.
+VERSION = "0.2.0"
+
 ACTUATOR = "actuator"
 CORE_CLIMATE_TIMER = "core_climate_timer"
 CORE_CLIMATE = "core_climate"
