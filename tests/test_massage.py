@@ -151,6 +151,14 @@ async def test_mode_is_sent_alone():
     )
 
 
+async def test_a_mode_write_sends_no_timer_and_sets_none_locally():
+    api = _api()
+    massage = SleepIQMassage(api, BED_ID, Side.LEFT)
+    await massage.set_mode(Mode.WAVE)
+    assert "massageTimer" not in api.put.await_args.args[1]
+    assert massage.timer == 0
+
+
 async def test_turning_the_mode_off_leaves_the_speeds_and_timer_alone():
     api = _api()
     massage = SleepIQMassage(api, BED_ID, Side.LEFT)
