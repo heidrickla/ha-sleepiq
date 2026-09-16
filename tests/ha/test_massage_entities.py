@@ -224,6 +224,7 @@ async def test_diagnostics_redact_the_account_and_the_household(
     assert diag["last_update_success"]["status"] is True
     bed = diag["beds"][0]
     assert bed["id"] == BED_ID
+    assert bed["name"] == "**REDACTED**"
     assert bed["mac_addr"] == "**REDACTED**"
     assert bed["foundation"]["features"]["hasMassageAndLight"] is True
     assert bed["sleepers"][0]["sleeper_name"] == "**REDACTED**"
@@ -232,3 +233,19 @@ async def test_diagnostics_redact_the_account_and_the_household(
     assert bed["massage"][0]["timer"] == 12
     assert bed["massage"][1]["mode"] == "soothe"
     assert bed["massage"][1]["raw"]["waveMode"] == 1
+
+
+async def test_diagnostics_ship_only_the_named_entry_keys(
+    hass: HomeAssistant, mock_asyncsleepiq
+) -> None:
+    """A key the deprecated YAML block put in entry.data must not travel."""
+    entry = await setup_platform(hass, [SELECT_DOMAIN])
+    hass.config_entries.async_update_entry(
+        entry, data={**entry.data, "host": "192.168.0.5"}
+    )
+    await hass.async_block_till_done()
+
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+
+    assert set(diag["entry"]) == {CONF_USERNAME, "password"}
+    assert "192.168.0.5" not in str(diag)
