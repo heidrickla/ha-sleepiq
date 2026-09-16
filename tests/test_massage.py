@@ -199,7 +199,7 @@ def test_a_bed_without_the_massage_board_gets_no_sides():
 
 
 def test_a_bed_with_the_board_gets_one_object_per_side():
-    sides = build_massage_sides(_api(), _bed((Side.LEFT, "Lewis")))
+    sides = build_massage_sides(_api(), _bed((Side.LEFT, "Amy")))
     assert [m.side for m in sides] == [Side.LEFT, Side.RIGHT]
     assert {m.bed_id for m in sides} == {BED_ID}
 
@@ -223,12 +223,12 @@ async def test_update_skips_the_request_for_a_bed_without_sides():
 
 
 def test_label_is_the_sleeper_on_that_side():
-    bed = _bed((Side.LEFT, "Lewis"), (Side.RIGHT, "Sam"))
-    assert side_label(bed, Side.LEFT) == "Lewis"
+    bed = _bed((Side.LEFT, "Amy"), (Side.RIGHT, "Sam"))
+    assert side_label(bed, Side.LEFT) == "Amy"
     assert side_label(bed, Side.RIGHT) == "Sam"
 
 
 def test_label_falls_back_to_the_physical_side_not_the_first_sleeper():
-    bed = _bed((Side.LEFT, "Lewis"))
+    bed = _bed((Side.LEFT, "Amy"))
     assert side_label(bed, Side.RIGHT) == "Right"
     assert side_label(_bed((Side.RIGHT, "")), Side.RIGHT) == "Right"

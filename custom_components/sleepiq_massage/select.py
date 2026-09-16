@@ -236,10 +236,9 @@ class SleepIQMassageSelect(
     """Common shape of the massage selects for one side of a bed.
 
     Named by sleeper rather than by physical side, matching how core names the
-    other per-sleeper comfort hardware (foot warmer, core climate). "Lewis
-    massage mode" is what someone reaches for; "Right massage mode" makes them
-    work out which side they are. The unique id, though, is keyed on the
-    physical side, so a bed with one sleeper still gets two distinct entities.
+    other per-sleeper comfort hardware (foot warmer, core climate). The unique
+    id is keyed on the physical side, so a bed with one sleeper still gets two
+    distinct entities.
     """
 
     def __init__(

@@ -1,28 +1,21 @@
 """Massage (vibration) state and control for a SleepIQ foundation.
 
-This module exists because `asyncsleepiq` can *write* massage but never *reads*
-it. `SleepIQFoundation.set_foundation_massage()` ships and works, but the
-library has no massage object, nothing calls `GET bed/{id}/foundation/massage`,
-and the response fields (`footMassageMotorSpeed`, `headMassageMotorSpeed`,
-`waveMode`, `massageTimer`) appear nowhere in it. Without readback there is
-nothing for a Home Assistant entity to display, which is why upstream exposes no
-massage entities at all.
+asyncsleepiq has no massage object and nothing in it calls
+GET bed/{id}/foundation/massage, so this supplies the read half and reuses the
+library's public request methods for the write half. AsyncSleepIQ subclasses
+SleepIQAPI, so nothing private is reached into.
 
-So this fills in the read half and reuses the library's public request methods
-for the write half. The client object is itself the API (`AsyncSleepIQ`
-subclasses `SleepIQAPI`), so nothing private is reached into.
+Full-body patterns and the individual motor speeds are mutually exclusive:
+set_foundation_massage() forces both speeds to OFF whenever a mode is set.
+Entities mirror that in both directions or the UI shows a state the bed is not
+in.
 
-The one behavioural rule that matters: **full-body patterns and the individual
-motor speeds are mutually exclusive.** `set_foundation_massage()` forces both
-speeds to OFF whenever a mode is set, and the vendor app agrees - its massage
-screen reads "Adjust either foot and head or full body massage", with Foot/Head
-and Full Body as two separate panels. Entities mirror that in both directions or
-the UI will lie about the bed's state.
+Mode.SOOTHE is the app's Smooth. The enum order matches the app's row (Off,
+Smooth, Revitalize, Wave), so SOOTHE=1 is Smooth; the translations use the
+app's wording.
 
-Naming note: the library's `Mode.SOOTHE` is what the app labels **Smooth**. The
-enum order matches the app's row exactly (Off, Smooth, Revitalize, Wave), so
-SOOTHE=1 is Smooth. The translation strings use the app's wording, because that
-is what is printed on the remote in the user's hand.
+README.md carries the rest: the hardware measurements, the timer expiry
+behaviour and the open Full Body write.
 """
 
 from __future__ import annotations
@@ -74,10 +67,9 @@ def side_label(bed: SleepIQBed, side: Side) -> str:
     """The word that names one side's entities.
 
     The sleeper's first name when someone sleeps on that side, otherwise the
-    physical side. "Lewis massage mode" is what someone reaches for; "Right
-    massage mode" makes them work out which side they are. Unlike core, this
-    never falls back to the first sleeper, so a bed where only one side has a
-    sleeper still gets two distinctly named sides.
+    physical side. Unlike core, this never falls back to the first sleeper, so
+    a bed where only one side has a sleeper still gets two distinctly named
+    sides.
     """
     for sleeper in bed.sleepers:
         if sleeper.side == side and sleeper.name:
