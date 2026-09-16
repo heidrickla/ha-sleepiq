@@ -587,6 +587,110 @@ def tree_hits(text: str, name_re: Any = None) -> list[tuple[int, str]]:
     return hits
 
 
+# ------------------------------------------------- object-database refusal
+# published_files() reads the index, so the tree scan cannot see an object no
+# ref reaches. A force-push replaces the branch and leaves the objects behind,
+# and a forge serves an unreachable commit by its SHA, so an orphan is
+# published while every HEAD-scoped and ref-scoped check reports clean. This
+# pass runs the same matchers over every blob and commit message in the
+# object database.
+#
+# Objects whose hits are the pinned address table itself, by SHA and reason.
+# A version of tools/_netblocks.py is exempt by its name in the tree instead,
+# so a later edit to that file needs no entry here.
+SCAN_EXEMPT_OBJECTS = {
+    # commit message stating the CIDRs the tree scan pins and the outside
+    # address it was measured with
+    "10e8e867df6cb1d41b76ef236a496dcaa5092afe": "development-host refusal",
+    # commit message stating the CIDRs the manifest URL rule pins
+    "e3892ca20b494039a6678e51bfe9b8c7e1330ad9": "manifest URL refusal",
+}
+# A blob above this is not prose. The largest text object in this repository
+# is under 100 KiB.
+MAX_SCANNED_OBJECT = 2 * 1024 * 1024
+_EXEMPT_BASENAME = SCAN_EXEMPT[0].rsplit("/", 1)[-1].encode()
+
+
+def object_records() -> list[tuple[str, str, bytes]] | None:
+    """Every object in the database, as (sha, type, body). None without git.
+
+    One `git cat-file --batch --batch-all-objects` call. Records are
+    `<sha> <type> <size>\\n<body>\\n`, so the body is taken by length and a
+    binary tree survives the split.
+    """
+    try:
+        proc = _subprocess.run(
+            ["git", "cat-file", "--batch", "--batch-all-objects"],
+            cwd=ROOT,
+            capture_output=True,
+            timeout=300,
+        )
+    except (OSError, _subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    out = proc.stdout
+    records: list[tuple[str, str, bytes]] = []
+    pos = 0
+    while pos < len(out):
+        end = out.find(b"\n", pos)
+        if end < 0:
+            break
+        parts = out[pos:end].split()
+        if len(parts) != 3:
+            break
+        sha, kind, size = parts[0].decode(), parts[1].decode(), int(parts[2])
+        records.append((sha, kind, out[end + 1 : end + 1 + size]))
+        pos = end + 1 + size + 1
+    return records
+
+
+def netblock_blobs(records: list[tuple[str, str, bytes]]) -> set[str]:
+    """Every blob SHA recorded under the exempt file name in any tree."""
+    shas: set[str] = set()
+    for _sha, kind, body in records:
+        if kind != "tree":
+            continue
+        pos = 0
+        while pos < len(body):
+            sep = body.find(b"\0", pos)
+            if sep < 0:
+                break
+            name = body[pos:sep].split(b" ", 1)[-1]
+            if name == _EXEMPT_BASENAME:
+                shas.add(body[sep + 1 : sep + 21].hex())
+            pos = sep + 21
+    return shas
+
+
+def scan_object_database() -> None:
+    """Refuse a development host in any object this clone can serve by SHA."""
+    records = object_records()
+    if records is None:
+        notes.append("git not available - the object database was not scanned")
+        return
+    exempt = netblock_blobs(records) | set(SCAN_EXEMPT_OBJECTS)
+    seen = 0
+    for sha, kind, body in records:
+        if kind not in ("blob", "commit") or sha in exempt:
+            continue
+        if len(body) > MAX_SCANNED_OBJECT:
+            continue
+        try:
+            text = body.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        seen += 1
+        hosts = sorted({host for _number, host in tree_hits(text)})
+        if hosts:
+            failures.append(
+                f"{kind} {sha} names {', '.join(hosts)} - the object database "
+                "serves it by SHA whether or not a ref reaches it"
+            )
+    check(seen > 0, "the object-database scan read no objects, so it proved nothing")
+    notes.append(f"{seen} objects scanned in the object database")
+
+
 def scan_published_tree() -> None:
     """Refuse a development host anywhere in the published tree."""
     exempt = os.path.join(ROOT, *SCAN_EXEMPT[0].split("/"))
@@ -897,6 +1001,7 @@ def main() -> int:
                 f"manifest {_key} is not an absolute http(s) URL a user can open",
             )
     scan_published_tree()
+    scan_object_database()
 
     # ---------------------------------------------------------- syntax
     for dirpath, _dirs, files in os.walk(COMP):
