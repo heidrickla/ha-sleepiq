@@ -2,7 +2,8 @@
 # Re-check these when syncing; a changed hash means upstream moved.
 #
 # A line ending in `modified` is a file this project edits on purpose; NOTICE
-# says how. tools/validate_local.py and the Gitea lint job read this marker:
+# says how. tools/validate_local.py and the lint job in
+# .gitea/workflows/validate.yml read this marker:
 # an unmarked file must still match its hash byte for byte, a marked one must
 # differ. Touching a file for the first time means marking it here and
 # describing the change in NOTICE in the same commit.
