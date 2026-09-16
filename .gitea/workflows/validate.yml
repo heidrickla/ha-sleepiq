@@ -157,8 +157,7 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # Brand art ships in custom_components/sleepiq_massage/brand/, which
-          # Home Assistant serves at /api/brands/integration/<domain>/<file>.
-          # The action's brands check reads home-assistant/brands, where this
-          # project does not register.
-          ignore: brands
+          # No `ignore:` key on purpose. The hacs/default pull-request template
+          # asks explicitly whether any check was ignored, and ignoring one is
+          # a reason for rejection. The brands check reads the tree's
+          # custom_components/sleepiq_massage/brand/icon.png.
