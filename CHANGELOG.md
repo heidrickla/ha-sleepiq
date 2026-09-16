@@ -123,13 +123,14 @@ Newest first, in the style of
   object alone. `refuse_truncated_history()` fails on
   `git rev-parse --is-shallow-repository`, and again when the database holds
   one commit object while the clone has two or more refs. The Tests workflow
-  checks out with `fetch-depth: 0`. Measured 2026-09-16 at HEAD, names
-  supplied: the authoring clone scans 347 objects and exits 1 on one reachable
-  commit message plus eight objects no ref reaches; a full clone of the same
-  HEAD scans 308 and exits 1 on that one reachable commit message; a
-  `--depth 1` clone scans 51 and exits 1 on both truncation failures. Before
-  the guard the same `--depth 1` clone printed "all offline checks passed" and
-  exited 0.
+  checks out with `fetch-depth: 0`. Measured 2026-09-16 at commit `1e6b5dd`
+  with names supplied: the authoring clone scans 356 objects and exits 1 on one
+  commit message reachable from `main` plus eight objects no ref reaches; a
+  full clone of that commit scans 317 and exits 1 on the reachable commit
+  message alone; a `--depth 1` clone scans 51 and exits 1 on both truncation
+  failures. Before the guard the same `--depth 1` clone printed "all offline
+  checks passed" and exited 0. The object count rises with every commit, so it
+  is quoted against that commit rather than against HEAD.
 - `.gitignore` holds build and editor artefacts only. The rules that keep the
   local agent files and `docs/local/` out of the tree moved to
   `.git/info/exclude`, which `git ls-files --exclude-standard` reads and which
