@@ -25,9 +25,9 @@ asyncio_mode = "auto"
 # strict block core applies to a strict-typed integration, with nothing
 # relaxed and no per-module allowance for the component or its library: every
 # name is imported from the module that defines it, because neither
-# asyncsleepiq nor homeassistant.components.light re-exports explicitly and
-# strict mode is right to say so. The GitHub Tests job runs this with Home
-# Assistant installed, which is the run that counts.
+# asyncsleepiq nor homeassistant.components.light re-exports explicitly. The
+# GitHub Tests job runs this with Home Assistant installed, which is the run
+# that counts.
 [tool.mypy]
 python_version = "3.14"
 strict = true

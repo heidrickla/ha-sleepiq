@@ -279,9 +279,8 @@ class SleepIQMassageModeSelect(SleepIQMassageSelect):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Expose the raw foundation/massage block for this side.
 
-        Lets the full field set be observed live while the vendor app drives
-        the bed, which is how the pattern behaviour is being worked out. The
-        same block is in the diagnostics download as a snapshot.
+        Exposes the full field set live, which a downloaded snapshot cannot do.
+        The same block is in the diagnostics download as a snapshot.
         """
         return dict(self.massage.raw)
 
