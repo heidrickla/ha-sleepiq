@@ -116,9 +116,9 @@ class SleepIQMassage:
         `set_foundation_massage()` always sends all five fields, including
         `massageWaveMode`. The app never sends that field and only ever sends
         partial payloads - `{"headMassageMotor": 3, "side": "R"}`, and so on.
-        A full-payload write is discarded wholesale by this foundation: setting
-        a mode left both the mode AND the auto-armed timer at zero, while the
-        identical timer logic works on a speed write.
+        A full-payload mode write read back mode 0 and timer 0; the hardware
+        was not watched during that write. The same timer logic works on a
+        speed write.
 
         Note the read side returns `waveMode`, not `massageWaveMode`.
         """
@@ -128,16 +128,16 @@ class SleepIQMassage:
 
     async def set_mode(self, mode: Mode) -> None:
         """Set the wave mode. Any non-OFF mode cancels the motor speeds."""
-        # Send waveMode ALONE. The app's massage screen gives Full Body its own
-        # Start Timer, separate from the Foot/Head one, so massageTimer here
-        # probably arms the wrong timer and leaves the pattern with none - which
+        # Send waveMode by itself. The app's massage screen gives Full Body its
+        # own Start Timer, separate from the Foot/Head one, so massageTimer here
+        # probably arms the wrong timer and leaves the pattern with none, which
         # matches the observed behaviour of it running briefly then stopping.
+        # No timer is sent, so none is set locally either.
         await self._put({"waveMode": int(mode)})
         self.mode = mode
         if mode != Mode.OFF:
             self.foot_speed = Speed.OFF
             self.head_speed = Speed.OFF
-            self.timer = self.timer or MASSAGE_DEFAULT_TIMER
 
     async def set_speeds(
         self, foot_speed: Speed | None = None, head_speed: Speed | None = None
