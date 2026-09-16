@@ -18,8 +18,19 @@ verification.
 
 The development host names come from `HA_DEV_HOST_NAMES` or from
 `docs/local/dev-hosts.txt`, which is not part of the tree. Neither source
-supplying a name is a failure: the address half would pass while the name half
-matched nothing.
+supplying a name is a note, not a failure, and the note says the name half did
+not run, so an address-only result cannot read as a result that found nothing.
+
+No workflow supplies the names, so the name half is a local check. Observed
+2026-09-16 in a clone with no name input and `CI` set: the run covers the
+address literals, the URL hosts and the bare private host names, over the
+published tree and over every blob and commit message in the object database,
+and fires the address matcher against a synthetic control. A development host
+name written into the tree is caught by the run a maintainer makes before
+pushing, and by nothing in CI.
+
+A matched string is printed locally and withheld when `CI` or
+`GITHUB_ACTIONS` is set. See `disclose`.
 """
 
 from __future__ import annotations
@@ -139,6 +150,37 @@ ALL_RULES = {
 
 failures: list[str] = []
 notes: list[str] = []
+
+# Every runner sets CI; GITHUB_ACTIONS names the one whose run log is public
+# on a public repository. Either one set to anything but 0 or false withholds
+# a matched string.
+CI_ENV = ("CI", "GITHUB_ACTIONS")
+WITHHELD = "a string withheld from this public log"
+
+
+def redacting() -> bool:
+    """Whether a matched string may be printed."""
+    return any(
+        os.environ.get(key, "").strip().lower() not in ("", "0", "false")
+        for key in CI_ENV
+    )
+
+
+def disclose(text: str) -> str:
+    """A matched host as a message writes it.
+
+    Locally the string is the useful half: it is what the maintainer greps
+    for. In CI it is the disclosure these scans exist to prevent, so the file,
+    the line and the rule that fired are kept and the text is dropped. The
+    environment decides rather than a flag, because a workflow that forgets to
+    pass a flag would publish the string. Nothing derived from the text is
+    printed either: a truncated digest of a short host name is confirmable
+    against a candidate list, so it discloses what it summarises. Actions
+    masks a registered secret's exact value and the name matcher deliberately
+    matches a longer word, so the string reaching a log is the one masking
+    misses.
+    """
+    return WITHHELD if redacting() else text
 
 
 def read(*parts: str) -> str:
@@ -483,6 +525,13 @@ BARE_HOST_RE = re.compile(
 # A host made of anything else is a template - f"http://{host}/" - not a host.
 HOST_CHARS_RE = re.compile(r"^[a-z0-9.\-\[\]:]+$", re.IGNORECASE)
 
+# Which matcher produced a hit. A message carries this whether or not it
+# carries the matched string.
+RULE_NAME = "development host name"
+RULE_ADDRESS = "private address literal"
+RULE_URL = "private URL host"
+RULE_SUFFIX = "private domain suffix"
+
 
 def is_netmask(text: str) -> bool:
     """A dotted quad written as a contiguous subnet mask, 255.255.255.0 and up.
@@ -613,17 +662,21 @@ def published_files() -> list[str]:
     return sorted(keep)
 
 
-def tree_hits(text: str, name_re: Any = None) -> list[tuple[int, str]]:
-    """Every development host named in text, as (line number, host)."""
-    hits: list[tuple[int, str]] = []
+def tree_hits(text: str, name_re: Any = None) -> list[tuple[int, str, str]]:
+    """Every development host named in text, as (line number, host, rule).
+
+    The rule is carried out with the hit because it is what a message says
+    when the matched host itself is withheld.
+    """
+    hits: list[tuple[int, str, str]] = []
     for number, line in enumerate(text.splitlines(), 1):
         if name_re is not None:
             for name in name_re.findall(line):
                 if name.lower() not in ALLOWED_HOSTS:
-                    hits.append((number, name.lower()))
+                    hits.append((number, name.lower(), RULE_NAME))
         for literal in IP_LITERAL_RE.findall(line):
             if literal not in ALLOWED_HOSTS and blocked_address(literal, TREE_NETS):
-                hits.append((number, literal))
+                hits.append((number, literal, RULE_ADDRESS))
         for url in URL_RE.findall(line):
             try:
                 host = _urlsplit(url).hostname or ""
@@ -632,10 +685,10 @@ def tree_hits(text: str, name_re: Any = None) -> list[tuple[int, str]]:
             if not host or not HOST_CHARS_RE.match(host):
                 continue
             if blocked_host(host, TREE_NETS):
-                hits.append((number, host))
+                hits.append((number, host, RULE_URL))
         for name in BARE_HOST_RE.findall(line):
             if name.lower() not in ALLOWED_HOSTS:
-                hits.append((number, name.lower()))
+                hits.append((number, name.lower(), RULE_SUFFIX))
     return hits
 
 
@@ -648,15 +701,17 @@ def scan_controls(names: list[str], name_re: Any) -> None:
     address = str(next(n for n in TREE_NETS if n.version == 4).network_address + 1)
     check(
         tree_hits(f"control line naming {address}") != [],
-        f"the scans did not match {address}, an address they refuse, so a "
-        "clean scan says nothing about the addresses in this repository",
+        f"the {RULE_ADDRESS} rule did not match {disclose(address)}, an "
+        "address it refuses, so a clean scan says nothing about the addresses "
+        "in this repository",
     )
     if not names:
         return
     check(
         tree_hits(f"control line naming {names[0]}-ci", name_re) != [],
-        f"the scans did not match {names[0]}, a name they were given, so a "
-        "clean scan says nothing about the names in this repository",
+        f"the {RULE_NAME} rule did not match {disclose(names[0])}, a name it "
+        "was given, so a clean scan says nothing about the names in this "
+        "repository",
     )
 
 
@@ -677,6 +732,11 @@ SCAN_EXEMPT_OBJECTS = {
     "10e8e867df6cb1d41b76ef236a496dcaa5092afe": "development-host refusal",
     # commit message stating the CIDRs the manifest URL rule pins
     "e3892ca20b494039a6678e51bfe9b8c7e1330ad9": "manifest URL refusal",
+    # commit message quoting the address its own measurement was made with.
+    # Reachable from main, so it is in every clone, and commit messages are
+    # not rewritten here. The address is published already; the exemption
+    # records that rather than implying the scan found nothing.
+    "231bc1d4677d76a5585f2d033bd638a42d5818c7": "object-database scan measurement",
 }
 # A blob above this is not prose. The largest text object in this repository
 # is under 100 KiB.
@@ -796,14 +856,22 @@ def scan_object_database(name_re: Any = None) -> None:
         except UnicodeDecodeError:
             continue
         seen += 1
-        hosts = sorted({host for _number, host in tree_hits(text, name_re)})
-        if hosts:
+        found = tree_hits(text, name_re)
+        if found:
+            fired = sorted({rule for _n, _h, rule in found})
+            rules = ", ".join(fired)
+            noun = "rule" if len(fired) == 1 else "rules"
+            hosts = ", ".join(sorted({disclose(host) for _n, host, _r in found}))
             failures.append(
-                f"{kind} {sha} names {', '.join(hosts)} - the object database "
-                "serves it by SHA whether or not a ref reaches it"
+                f"{kind} {sha} matched the {rules} {noun} on {hosts} - the "
+                "object database serves it by SHA whether or not a ref "
+                "reaches it"
             )
     check(seen > 0, "the object-database scan read no objects, so it proved nothing")
     notes.append(f"{seen} objects scanned in the object database")
+    notes.append(
+        f"{len(exempt)} objects exempt from the object scan by SHA or by file name"
+    )
 
 
 def scan_published_tree(name_re: Any = None) -> None:
@@ -835,10 +903,11 @@ def scan_published_tree(name_re: Any = None) -> None:
         except OSError, UnicodeDecodeError:
             continue
         seen += 1
-        for number, host in tree_hits(text, name_re):
+        for number, host, rule in tree_hits(text, name_re):
             failures.append(
-                f"{path}:{number} names {host} - that host is on the development "
-                "network and means nothing to a user who installs this"
+                f"{path}:{number} matched the {rule} rule on {disclose(host)} - "
+                "that host is on the development network and means nothing to "
+                "a user who installs this"
             )
     check(seen > 0, "the published-tree scan read no files, so it proved nothing")
 
@@ -871,8 +940,9 @@ def main() -> int:
         host = unreachable_host(url)
         check(
             host is None,
-            f"manifest {key} host {host!r} is not reachable from outside this "
-            f"network - publish the URL a user can open",
+            f"manifest {key} names {disclose(host or '')}, which is not "
+            "reachable from outside this network - publish the URL a user can "
+            "open",
         )
     keys = list(manifest)
     check(
@@ -1111,12 +1181,16 @@ def main() -> int:
     dev_names = internal_names()
     dev_name_re = name_matcher(dev_names)
     if dev_names:
-        notes.append(f"{len(dev_names)} development host names given to the scans")
+        plural = "" if len(dev_names) == 1 else "s"
+        notes.append(
+            f"{len(dev_names)} development host name{plural} given to the scans"
+        )
     else:
-        failures.append(
-            "no development host names reached the scans, so their name half "
-            f"matched nothing - set {DEV_HOST_ENV} or write "
-            f"{'/'.join(DEV_HOST_FILE)}"
+        notes.append(
+            "no development host names given to the scans, so their name half "
+            "did not run and this result covers addresses and URLs only; set "
+            f"{DEV_HOST_ENV}, or write {'/'.join(DEV_HOST_FILE)}, to run the "
+            "name half"
         )
     scan_controls(dev_names, dev_name_re)
     scan_published_tree(dev_name_re)
