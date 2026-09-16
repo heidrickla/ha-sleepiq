@@ -363,7 +363,7 @@ Three request shapes have been tried, all on an **idle** side:
 By contrast, a pattern set from the **vendor phone app** persists. So the
 correct request differs from all three of the above in some way that has not
 been guessed. Three attempts, three failures - the remaining move is to observe
-the real request rather than infer it; `docs/NEXT-SESSION.md` has the plan.
+the real request rather than infer it.
 
 Likely direction, from the app's own UI: the massage screen gives **Full Body
 its own Start Timer**, separate from the Foot/Head one. A pattern may need that
