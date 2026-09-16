@@ -1,24 +1,40 @@
-"""Stand-ins for the POSIX modules Home Assistant imports at plugin load.
+"""Windows stand-ins for the POSIX facilities the Home Assistant test harness needs.
 
-Home Assistant 2026.8 imports `fcntl` (runner.py, for the lock file it takes
-when it runs as a daemon) and `resource` (util/resource.py, to raise the open
-file descriptor soft limit) at import time. Neither exists on Windows, and both
-are reached while pytest is still loading the
-pytest-homeassistant-custom-component plugin, before any conftest runs, so the
-whole session aborts on a Windows workstation with ModuleNotFoundError.
+Four separate blocks stop the HA-layer suite on a Windows workstation, in this
+order:
 
-Neither module does anything a test depends on: the lock file is never taken
-under pytest and the descriptor limit is a process setting. This module is
-loaded with `-p tests.winposix` from pyproject.toml, which pytest handles before
-it loads entry point plugins, and registers a minimal stand-in for each - but
-only on Windows. On Linux, and so in CI, importing this module changes nothing.
+| Blocker | Where | Fix here |
+|---|---|---|
+| `import fcntl` | `homeassistant/runner.py` | `install_posix_modules()` |
+| `import resource` | `homeassistant/util/resource.py` | `install_posix_modules()` |
+| `pytest_socket` refuses `socket.socketpair()` | ProactorEventLoop self-pipe | `install_socketpair_escape()` |
+| `aiodns` refuses the Proactor loop | `homeassistant.runner` loop factory | `use_selector_event_loop()` |
+
+The first two are reached while pytest is still loading the
+pytest-homeassistant-custom-component entry point plugin, before any conftest
+runs, so they must be installed earlier than a conftest can act. Loading this
+module with `-p tests.winposix` from `pyproject.toml` is early enough: pytest
+handles `-p` before entry point plugins. `install_posix_modules()` therefore
+runs at import.
+
+The last two need Home Assistant importable and belong to the HA-layer suite
+only, so `tests/ha/conftest.py` calls `install_ha_layer_shims()` itself.
+
+Every function returns immediately on anything but Windows, so importing this
+module changes nothing on Linux and nothing in CI.
+
+Neither replaced module does anything a test depends on: the lock file is never
+taken under pytest and the descriptor limit is a process setting.
 """
 
 from __future__ import annotations
 
+import socket
 import sys
 from types import ModuleType
 from typing import Any
+
+_WINDOWS = sys.platform == "win32"
 
 
 def _fcntl_module() -> ModuleType:
@@ -51,9 +67,9 @@ def _resource_module() -> ModuleType:
     return module
 
 
-def _install() -> None:
+def install_posix_modules() -> None:
     """Put the stand-ins in place before Home Assistant is imported."""
-    if sys.platform != "win32":
+    if not _WINDOWS:
         return
     builders: dict[str, Any] = {"fcntl": _fcntl_module, "resource": _resource_module}
     for name, build in builders.items():
@@ -61,4 +77,52 @@ def _install() -> None:
             sys.modules[name] = build()
 
 
-_install()
+def install_socketpair_escape() -> None:
+    """Let `socket.socketpair()` through the harness's socket block.
+
+    ProactorEventLoop builds its self-pipe from `socket.socketpair()`, which
+    pytest-socket refuses because it is not a unix socket, so every test errors
+    before it runs. Hand socketpair the real socket class for the length of
+    that one call; every other socket stays blocked, here and on Linux CI.
+
+    Idempotent: calling it twice leaves one wrapper.
+    """
+    if not _WINDOWS or getattr(socket.socketpair, "_winposix", False):
+        return
+    real_socket = socket.socket
+    real_socketpair = socket.socketpair
+
+    def _unguarded_socketpair(*args: Any, **kwargs: Any) -> Any:
+        guarded = socket.socket
+        socket.socket = real_socket  # type: ignore[misc]
+        try:
+            return real_socketpair(*args, **kwargs)
+        finally:
+            socket.socket = guarded  # type: ignore[misc]
+
+    _unguarded_socketpair._winposix = True  # type: ignore[attr-defined]
+    socket.socketpair = _unguarded_socketpair
+
+
+def use_selector_event_loop() -> None:
+    """Run the suite on the selector loop.
+
+    aiodns, which aiohttp resolves with, refuses to run on the Proactor loop
+    Home Assistant picks on Windows. The selector loop runs the same tests.
+    """
+    if not _WINDOWS:
+        return
+    import asyncio
+
+    from homeassistant import runner
+
+    runner.HassEventLoopPolicy._loop_factory = asyncio.SelectorEventLoop
+
+
+def install_ha_layer_shims() -> None:
+    """Both shims the HA-layer suite needs. Call from `tests/ha/conftest.py`."""
+    install_socketpair_escape()
+    use_selector_event_loop()
+
+
+install_posix_modules()
