@@ -1,6 +1,6 @@
 """Windows stand-ins for the POSIX facilities the Home Assistant test harness needs.
 
-Four separate blocks stop the HA-layer suite on a Windows workstation, in this
+Three separate blocks stop the HA-layer suite on a Windows workstation, in this
 order:
 
 | Blocker | Where | Fix here |
@@ -8,7 +8,13 @@ order:
 | `import fcntl` | `homeassistant/runner.py` | `install_posix_modules()` |
 | `import resource` | `homeassistant/util/resource.py` | `install_posix_modules()` |
 | `pytest_socket` refuses `socket.socketpair()` | ProactorEventLoop self-pipe | `install_socketpair_escape()` |
-| `aiodns` refuses the Proactor loop | `homeassistant.runner` loop factory | `use_selector_event_loop()` |
+
+`use_selector_event_loop()` is a fourth shim and stops none of this suite.
+`aiodns`, which aiohttp resolves with, refuses the Proactor loop
+`homeassistant.runner` picks on Windows. Measured 2026-09-16 with the call
+replaced by a no-op and the loop factory left as `ProactorEventLoop`: 74
+passed, the same count as the pristine run. It guards the first test here that
+resolves a name.
 
 The first two are reached while pytest is still loading the
 pytest-homeassistant-custom-component entry point plugin, before any conftest
@@ -17,8 +23,9 @@ module with `-p tests.winposix` from `pyproject.toml` is early enough: pytest
 handles `-p` before entry point plugins. `install_posix_modules()` therefore
 runs at import.
 
-The last two need Home Assistant importable and belong to the HA-layer suite
-only, so `tests/ha/conftest.py` calls `install_ha_layer_shims()` itself.
+The socketpair escape and the selector loop need Home Assistant importable and
+belong to the HA-layer suite only, so `tests/ha/conftest.py` calls
+`install_ha_layer_shims()` itself.
 
 Every function returns immediately on anything but Windows, so importing this
 module changes nothing on Linux and nothing in CI.
@@ -109,6 +116,7 @@ def use_selector_event_loop() -> None:
 
     aiodns, which aiohttp resolves with, refuses to run on the Proactor loop
     Home Assistant picks on Windows. The selector loop runs the same tests.
+    Guard, not a dependency: see the module docstring for the measurement.
     """
     if not _WINDOWS:
         return
@@ -120,7 +128,10 @@ def use_selector_event_loop() -> None:
 
 
 def install_ha_layer_shims() -> None:
-    """Both shims the HA-layer suite needs. Call from `tests/ha/conftest.py`."""
+    """The two shims that need Home Assistant importable.
+
+    Call from `tests/ha/conftest.py`.
+    """
     install_socketpair_escape()
     use_selector_event_loop()
 
