@@ -36,6 +36,7 @@ and create their own devices and entities.
 | Both are set up | Two sets of entities for the same bed. The second set's entity ids get a `_2` suffix, because the names collide. |
 | You want one set | Delete core's config entry: Settings > Devices & services > SleepIQ > three dots > Delete. Its entities and their history go with it. |
 | Upgrading from 0.1.0 of this repo | The 0.1.0 directory is left on disk and keeps shadowing core's `sleepiq`. Delete it, as below. |
+| A bed is discovered by DHCP | Two cards, one per integration. Core's matcher is in Home Assistant itself; dropping this repo's matcher would leave core's card alone. |
 
 Unique ids are registered against this integration's own platform, so they
 never collide with core's even where the id string is the same.
@@ -175,10 +176,17 @@ Minimum Home Assistant version: 2026.8.0.
 ### Discovery
 
 A SleepNumber bed on the same network is picked up by Home Assistant's DHCP
-watcher and appears as a discovered card. The bed announces nothing about which
-SleepIQ account owns it, and this integration talks to the cloud rather than to
-the bed, so the card opens the same sign-in form. When an account is already set
-up the discovery is ignored: one entry already covers every bed on it.
+watcher. Core's `sleepiq` claims the same MAC prefix `64DBA0*` and Home
+Assistant appends a custom integration's matchers to core's list instead of
+replacing them, so one bed raises two cards: SleepIQ and SleepIQ (with massage).
+Take the second. Core's card stays in the discovered list until it is set up or
+ignored, and setting it up gives a second set of entities for the same bed.
+
+The bed announces nothing about which SleepIQ account owns it, and this
+integration talks to the cloud rather than to the bed, so the card opens the
+same sign-in form. When this integration already has an entry its card is not
+raised again: one entry covers every bed on the account. An entry of core's does
+not suppress this card, and this one does not suppress core's.
 
 ### Configuration options
 

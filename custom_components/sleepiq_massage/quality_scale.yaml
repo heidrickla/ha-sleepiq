@@ -201,7 +201,11 @@ rules:
       async_step_dhcp. The bed announces nothing about which SleepIQ account
       owns it and the integration talks to the cloud, so the step offers the
       sign-in form; when an entry already exists it aborts, because one entry
-      covers every bed on the account. Both outcomes are tested.
+      covers every bed on the account. Both outcomes are tested. Core's sleepiq
+      declares the same 64DBA0* prefix and loader.async_get_dhcp appends custom
+      matchers to core's list rather than replacing by domain, so one bed raises
+      a card for each domain; dropping this matcher would leave the user with
+      core's card alone. README documents the second card.
   discovery-update-info:
     status: exempt
     comment: |
