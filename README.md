@@ -479,26 +479,26 @@ and measures what it wrote.
 need only `asyncsleepiq`, and the Home Assistant layer tests, which need
 `pytest-homeassistant-custom-component`.
 
-Three things make the Home Assistant suite run on a Windows workstation as well
-as on the Linux CI runner, and all three are needed:
+`tests/winposix.py` carries every shim the Home Assistant suite needs on a
+Windows workstation. Each one returns immediately on anything but Windows, so
+none of them does anything on the Linux CI runner.
 
-- `tests/winposix.py` stands in for `fcntl` and `resource`. Home Assistant
-  2026.8 imports both while pytest is still loading the harness plugin, before
-  any conftest runs, so without it the session aborts on
-  `ModuleNotFoundError: No module named 'fcntl'` and not one test is collected.
-  `pyproject.toml` loads it with `-p tests.winposix`, which pytest handles
-  before the entry point plugins. Run pytest as `python -m pytest`, on either
-  platform, so the repository root is on `sys.path`: a bare `pytest` stops with
-  `Error importing plugin "tests.winposix"` unless the root is on `PYTHONPATH`.
-  CI runs it as a module for the same reason.
-- `tests/ha/conftest.py` hands the event loop a real socket pair for its own
-  wakeup pipe, which the harness's socket block otherwise refuses.
-- The same conftest puts Home Assistant on the selector loop, because aiodns
-  refuses the proactor one Windows would pick.
+| Blocker | Shim | Measured with the shim removed, 2026-09-16 |
+| --- | --- | --- |
+| `homeassistant/runner.py` imports `fcntl` and `homeassistant/util/resource.py` imports `resource`, both while pytest is still loading the harness plugin | `install_posix_modules()`, at import | Session aborts on `ModuleNotFoundError: No module named 'fcntl'`, 0 collected |
+| `pytest_socket` refuses the `socket.socketpair()` the proactor loop builds its wakeup pipe from | `install_socketpair_escape()` | 74 errors, the whole `tests/ha` directory |
+| `aiodns`, which aiohttp resolves with, refuses the proactor loop Home Assistant picks on Windows | `use_selector_event_loop()` | 74 passed. Nothing in this suite resolves a name, so the shim is a guard against a test that does, not a current dependency |
 
-None of the three does anything on Linux. On Windows the first test of a
-session can still fail the harness's own teardown check on a lingering shutdown
-thread; the assertions themselves run.
+`pyproject.toml` loads the module with `-p tests.winposix`, which pytest
+handles before the entry point plugins. `tests/ha/conftest.py` calls
+`install_ha_layer_shims()` for the last two, which need Home Assistant
+importable. Run pytest as `python -m pytest`, on either platform, so the
+repository root is on `sys.path`: a bare `pytest` stops with
+`Error importing plugin "tests.winposix"` unless the root is on `PYTHONPATH`.
+CI runs it as a module for the same reason.
+
+On Windows the first test of a session can still fail the harness's own
+teardown check on a lingering shutdown thread; the assertions themselves run.
 
 The GitHub Tests workflow is the check that counts: ruff, both suites over one
 coverage total gated at 95%, mypy in strict mode with Home Assistant installed,

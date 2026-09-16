@@ -54,9 +54,21 @@ Newest first, in the style of
 ### Development
 
 - `tools/validate_local.py` fails a `documentation` or `issue_tracker` URL
-  whose host is private, loopback, link-local, `localhost`, a `.local`, `.lan`
-  or `.internal` name, or a bare hostname with no dot. It also fails
-  `brands: done` when a brand file is missing or the wrong size.
+  whose host is private, CGNAT, link-local, unique-local, reserved, loopback,
+  the unspecified address, `localhost`, an internal suffix or a bare hostname
+  with no dot, and fails a value that is not an absolute http(s) URL. It also
+  fails `brands: done` when a brand file is missing or the wrong size.
+- `tools/validate_local.py` scans every text file `git ls-files` reports and
+  fails on an address or internal name that belongs to a development network.
+  The address space is pinned in `tools/_netblocks.py`, which is the one
+  published file the scan skips and which may hold nothing but those three
+  names. 51 files are read on this tree; a scan that reads none fails.
+- The mypy block is Home Assistant core's generated `mypy.ini` `[mypy]` section
+  at 2026.8.3 plus `strict`. The `tests.*` override dropped `strict = false`,
+  which mypy 1.18.2 accepts in a per-module section and then uses to discard
+  the whole section.
+- Every Windows test shim lives in `tests/winposix.py`; `tests/ha/conftest.py`
+  calls `install_ha_layer_shims()` instead of carrying its own copies.
 
 ## [0.1.0] - 2026-09-05
 
