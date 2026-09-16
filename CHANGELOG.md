@@ -121,7 +121,12 @@ Newest first, in the style of
   reporting the file, the line and the rule with the string withheld; the same
   off CI, exit 1 with the string printed; the address matcher replaced with one
   that matches nothing, exit 1 on its control; the name matcher likewise, exit
-  1 on its control; the pristine tree with the real names supplied, exit 0.
+  1 on its control; the pristine tree with the real names supplied, exit 0. The
+  object count rises with every commit, so it is quoted against the commit it
+  was read at: a clone of `c266d82` fetched over the wire scans 324 objects and
+  exempts 4. The authoring clone holds eight more objects no ref reaches, each
+  one a real disclosure, so the validator exits 1 there and exits 0 on the
+  clone; only a history rewrite and a prune clear them.
 - `const.VERSION` joins `manifest.json` and `pyproject.toml` as a third
   version field, and the validator refuses a mismatch between any of them.
 - `.html` joins `PUBLISHED_SUFFIXES`, so an HTML file added to the tree is
