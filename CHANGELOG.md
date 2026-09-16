@@ -105,28 +105,65 @@ Newest first, in the style of
   names. 51 files are read on this tree; a scan that reads none fails.
 - The name half of both scans is live. `internal_names()` reads
   `HA_DEV_HOST_NAMES`, which holds the names comma or whitespace separated or
-  the path of a file listing them, and falls back to `docs/local/dev-hosts.txt`
+  the path of a file listing them, and falls back to `~/.config/ha-dev-hosts.txt`
   when the variable is unset. Both scans refuse each name with any trailing
   word characters. The names are never written into the tree, because that is
-  the disclosure the scans exist to prevent. Neither source supplying a name is
-  a note, not a failure, and the note names the variable that would run the
-  name half, so a run covering addresses and URLs only cannot read as a run
-  that found nothing. `scan_controls` fires both matchers on synthetic input so
-  a clean result is never a broken matcher. No workflow supplies the names, so
-  the name half is a local check; a matched string is printed locally and
-  withheld when `CI` or `GITHUB_ACTIONS` is set. Measured 2026-09-16 on a clone
-  fetched over the wire, which carries the objects a ref reaches as a checkout
-  does: `CI` and `GITHUB_ACTIONS` set with no name input, exit 0 and the note;
-  a development name added to `README.md` with the variable set to it, exit 1
-  reporting the file, the line and the rule with the string withheld; the same
-  off CI, exit 1 with the string printed; the address matcher replaced with one
-  that matches nothing, exit 1 on its control; the name matcher likewise, exit
-  1 on its control; the pristine tree with the real names supplied, exit 0. The
+  the disclosure the scans exist to prevent. `scan_controls` fires one control
+  per live matcher, so a clean result is never a broken matcher. No workflow
+  supplies the names, so the name half is a local check; a matched string is
+  printed locally and withheld when `CI` or `GITHUB_ACTIONS` is set. Measured
+  2026-09-16 on a clone fetched over the wire, which carries the objects a ref
+  reaches as a checkout does: `CI` and `GITHUB_ACTIONS` set with no name input,
+  exit 0 and the note; a development name added to `README.md` with the variable
+  set to it, exit 1 reporting the file, the line and the rule with the string
+  withheld; the same off CI, exit 1 with the string printed; each of the
+  address, URL and suffix matchers replaced in turn with one that matches
+  nothing, exit 1 on that rule's control; the name matcher likewise, exit 1 on
+  its control; the pristine tree with the real names supplied, exit 0. The
   object count rises with every commit, so it is quoted against the commit it
-  was read at: a clone of `c266d82` fetched over the wire scans 324 objects and
-  exempts 4. The authoring clone holds eight more objects no ref reaches, each
-  one a real disclosure, so the validator exits 1 there and exits 0 on the
-  clone; only a history rewrite and a prune clear them.
+  was read at: a clone of `54a58db` fetched over the wire scans 326 objects,
+  skips 4 as non-text and exempts 4. The authoring clone holds eight more
+  objects no ref reaches, each one a real disclosure, so the validator exits 1
+  there and exits 0 on the clone; only a history rewrite and a prune clear them.
+- The name input's fallback path moved out of the tree, to
+  `~/.config/ha-dev-hosts.txt`. The in-tree path it replaced was ignored only
+  through `.git/info/exclude`, which no clone receives: measured in a clone over
+  the git transport, `git check-ignore` exited 1 on that path, `git status`
+  listed it, and writing the file the validator's own note asked for made the
+  run exit 1 naming it. The out-of-tree path cannot be staged from any clone.
+- `refuse_unpublished_paths` fails when `.claude/`, `.cursorrules`, `AGENTS.md`,
+  `CLAUDE.md` or `docs/local/` is in `git ls-files --cached`. An ignore rule
+  cannot carry that refusal: `.gitignore` ships, so its rules describe what they
+  hide, and a rule in `.git/info/exclude` protects one machine. This check is in
+  the tree, so it travels. Measured in a transport clone: `git add -f` on
+  `CLAUDE.md` and on a file under `docs/local/` gives one failure each.
+- The tree scan skips `docs/local/`, in the git branch and the walk branch
+  alike. The walk honours no ignore rule, so an extracted tree with maintainer
+  notes beside it had its notes read and their paths printed in the failure
+  text.
+- A phrase half joins the scans. `HA_DEV_PRIVATE_PHRASES`, or
+  `~/.config/ha-dev-phrases.txt`, carries phrases that name private CI topology,
+  account structure or lab tooling; each is matched case-insensitively as a
+  substring over the published tree. That class holds no host, no address and no
+  private suffix, so no address matcher sees it. The phrase half reads the
+  published tree only: the object database holds commit messages of that class
+  which no rewrite here can reach.
+- An absent name or phrase input is a failure off CI and a note under `CI`. A
+  note either way let a local run exit 0 with the name half covering nothing.
+- The object scan withholds the matching object's SHA under `CI`. The SHA is a
+  complete retrieval key on a public repository: `git cat-file -p` in any clone,
+  and the REST blob endpoint with no clone at all, so printing it beside a
+  withheld string published what the string was withheld for. Measured in a
+  transport clone with `CI` set: the failure now names the object type and the
+  rules and withholds the SHA. The count of failure lines is the count of
+  matching objects, and a local run prints the SHAs.
+- The object scan counts the objects it did not read beside the objects it did:
+  a blob that is not UTF-8 and a blob over the size limit. A scanned count on
+  its own reads as coverage.
+- `SCAN_EXEMPT_OBJECTS` carries the true reason on each entry. One entry called
+  its address an outside address while the address sits inside a pinned CIDR,
+  and the entry for the object-scan measurement called the address published
+  while none of the three exempt commits is in the published history.
 - `const.VERSION` joins `manifest.json` and `pyproject.toml` as a third
   version field, and the validator refuses a mismatch between any of them.
 - `.html` joins `PUBLISHED_SUFFIXES`, so an HTML file added to the tree is

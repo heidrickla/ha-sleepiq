@@ -9,25 +9,34 @@ translation key, the manifest's published URLs against private address space,
 the brand images against their required pixel sizes, the version fields
 against each other, the quality scale against the pinned rule list, every
 rule marked `done` against the file set that would have to exist for it to be
-true, every text file git ships against the development addresses and names
-those scans refuse, and every blob and commit message in the object database
-against the same matchers. Run it before a push so the push is not the first
-verification.
+true, every text file git ships against the development addresses, names and
+infrastructure phrases those scans refuse, every blob and commit message in
+the object database against the same address matchers, and git's index against
+the paths a clone must never carry. Run it before a push so the push is not
+the first verification.
 
     python tools/validate_local.py
 
-The development host names come from `HA_DEV_HOST_NAMES` or from
-`docs/local/dev-hosts.txt`, which is not part of the tree. Neither source
-supplying a name is a note, not a failure, and the note says the name half did
-not run, so an address-only result cannot read as a result that found nothing.
+The development host names come from `HA_DEV_HOST_NAMES` or from a file under
+the user profile, outside every clone, so no clone can stage them and nothing
+here asks a reader to create a file inside the tree. Off CI a run with no name
+input fails, so a clean local exit means the name half ran. Under `CI` it is a
+note, because no workflow supplies the names.
 
-No workflow supplies the names, so the name half is a local check. Observed
-2026-09-16 in a clone with no name input and `CI` set: the run covers the
-address literals, the URL hosts and the bare private host names, over the
+Observed 2026-09-16 in a clone with no name input and `CI` set: the run covers
+the address literals, the URL hosts and the bare private host names, over the
 published tree and over every blob and commit message in the object database,
-and fires the address matcher against a synthetic control. A development host
-name written into the tree is caught by the run a maintainer makes before
+and fires a synthetic control for each of those three rules. A development
+host name written into the tree is caught by the run a maintainer makes before
 pushing, and by nothing in CI.
+
+The infrastructure phrases come from `HA_DEV_PRIVATE_PHRASES` or from a second
+file under the user profile. They match prose that names private CI topology,
+account structure or lab tooling without naming a host, which is a class none
+of the address matchers can see. The phrase half reads the published tree
+only: the object database holds commit messages of that class which no rewrite
+here can reach, so a matcher over them would refuse history rather than the
+next commit.
 
 A matched string is printed locally and withheld when `CI` or
 `GITHUB_ACTIONS` is set. See `disclose`.
@@ -446,34 +455,56 @@ ALLOWED_HOSTS = frozenset(
 
 # Development host names are matched as well as addresses, and they cannot be
 # listed here: naming them in a published file is the disclosure this rule
-# exists to prevent. The environment or an untracked file carries them in from
-# outside the tree.
+# exists to prevent. The environment or a file under the user profile carries
+# them in from outside every clone. An in-tree fallback path was the previous
+# design and is not usable: git ignores it only through .git/info/exclude,
+# which no clone receives, so the file the fallback asked for became a staged
+# file and a scan failure everywhere but the machine that wrote the exclude.
 DEV_HOST_ENV = "HA_DEV_HOST_NAMES"
-DEV_HOST_FILE = ("docs", "local", "dev-hosts.txt")
+DEV_HOST_FILE = "~/.config/ha-dev-hosts.txt"
+DEV_PHRASE_ENV = "HA_DEV_PRIVATE_PHRASES"
+DEV_PHRASE_FILE = "~/.config/ha-dev-phrases.txt"
+
+
+def outside_input(env: str, fallback: str) -> str:
+    """The raw contents of one out-of-tree input, or an empty string.
+
+    The variable holds the values directly or holds the path of a file listing
+    them, one per line with `#` starting a comment. With the variable unset the
+    fallback path under the user profile is read in the file form.
+    """
+    raw = os.environ.get(env, "").strip()
+    if not raw:
+        expanded = os.path.expanduser(fallback)
+        raw = expanded if os.path.isfile(expanded) else ""
+    if not raw:
+        return ""
+    if os.path.isfile(raw):
+        return "\n".join(line.split("#", 1)[0] for line in read(raw).splitlines())
+    return raw
 
 
 def internal_names() -> list[str]:
     """Development host names for the scans to refuse.
 
-    `HA_DEV_HOST_NAMES` holds the names comma or whitespace separated, or
-    holds the path of a file with one name per line and `#` starting a
-    comment. With the variable unset, `docs/local/dev-hosts.txt` is read in
-    the same file form; that path is excluded from the tree, so the names
-    reach the scans without being published. Each name matches with any
-    trailing word characters, so a bare name also catches the same name with a
-    role or a number appended. No example name is written here: this file is
-    scanned too, and a literal example is a hit the moment someone supplies
-    that name.
+    Each name matches with any trailing word characters, so a bare name also
+    catches the same name with a role or a number appended. No example name is
+    written here: this file is scanned too, and a literal example is a hit the
+    moment someone supplies that name.
     """
-    raw = os.environ.get(DEV_HOST_ENV, "").strip()
-    if not raw:
-        fallback = os.path.join(ROOT, *DEV_HOST_FILE)
-        raw = fallback if os.path.isfile(fallback) else ""
-    if not raw:
-        return []
-    if os.path.isfile(raw):
-        raw = "\n".join(line.split("#", 1)[0] for line in read(raw).splitlines())
+    raw = outside_input(DEV_HOST_ENV, DEV_HOST_FILE)
     return sorted({n.strip().lower() for n in re.split(r"[,\s]+", raw) if n.strip()})
+
+
+def internal_phrases() -> list[str]:
+    """Infrastructure phrases for the tree scan to refuse.
+
+    One phrase per line, matched case-insensitively as a substring, because a
+    phrase of this class is prose rather than a token. Newline separated only:
+    a phrase holds spaces and commas.
+    """
+    raw = outside_input(DEV_PHRASE_ENV, DEV_PHRASE_FILE)
+    return sorted({p.strip().lower() for p in raw.splitlines() if p.strip()})
 
 
 def name_matcher(names: list[str]) -> Any:
@@ -512,6 +543,22 @@ PUBLISHED_NAMES = {
 # The one published file the scan skips: it holds the CIDRs the scan matches
 # on, so it would report itself. Nothing else may live in it.
 SCAN_EXEMPT = ("tools/_netblocks.py",)
+# A directory of maintainer notes that no clone carries. The scan neither
+# reads it nor names it in a failure, so a run in an extracted tree with the
+# notes beside it reports on the repository rather than on the notes. A file
+# under it reaching the index is refused by refuse_unpublished_paths instead.
+SCAN_SKIP_PREFIXES = ("docs/local/",)
+# Paths that belong to a working copy and not to a clone. Each one is either
+# maintainer instructions or session configuration, and .gitignore cannot
+# carry the rule: the ignore file ships, so its rules describe what they hide.
+# This check travels with the tree the way an ignore rule does not.
+UNPUBLISHED_PATHS = (
+    ".claude/",
+    ".cursorrules",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "docs/local/",
+)
 
 IP_LITERAL_RE = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
 URL_RE = re.compile(r"\b[a-zA-Z][a-zA-Z0-9+.\-]*://[^\s\"'`<>)\]},]+")
@@ -531,6 +578,7 @@ RULE_NAME = "development host name"
 RULE_ADDRESS = "private address literal"
 RULE_URL = "private URL host"
 RULE_SUFFIX = "private domain suffix"
+RULE_PHRASE = "private infrastructure phrase"
 
 
 def is_netmask(text: str) -> bool:
@@ -621,7 +669,9 @@ def published_files() -> list[str]:
     """Every text file that ships, relative to ROOT, from git's own index.
 
     Falls back to a walk when git is not there - an extracted tarball - so the
-    rule still runs, and says so, rather than passing on an empty list.
+    rule still runs, and says so, rather than passing on an empty list. The
+    walk honours no ignore rule, so SCAN_SKIP_PREFIXES does the skipping that
+    git would have done in either branch.
     """
     paths: list[str] = []
     try:
@@ -651,7 +701,7 @@ def published_files() -> list[str]:
                 )
     keep: list[str] = []
     for path in paths:
-        if path in SCAN_EXEMPT:
+        if path in SCAN_EXEMPT or path.startswith(SCAN_SKIP_PREFIXES):
             continue
         name = path.rsplit("/", 1)[-1]
         if (
@@ -662,14 +712,21 @@ def published_files() -> list[str]:
     return sorted(keep)
 
 
-def tree_hits(text: str, name_re: Any = None) -> list[tuple[int, str, str]]:
+def tree_hits(
+    text: str, name_re: Any = None, phrases: tuple[str, ...] = ()
+) -> list[tuple[int, str, str]]:
     """Every development host named in text, as (line number, host, rule).
 
     The rule is carried out with the hit because it is what a message says
-    when the matched host itself is withheld.
+    when the matched host itself is withheld. `phrases` are passed by the tree
+    scan only; scan_object_database passes none.
     """
     hits: list[tuple[int, str, str]] = []
     for number, line in enumerate(text.splitlines(), 1):
+        lowered = line.lower()
+        for phrase in phrases:
+            if phrase in lowered:
+                hits.append((number, phrase, RULE_PHRASE))
         if name_re is not None:
             for name in name_re.findall(line):
                 if name.lower() not in ALLOWED_HOSTS:
@@ -692,23 +749,59 @@ def tree_hits(text: str, name_re: Any = None) -> list[tuple[int, str, str]]:
     return hits
 
 
-def scan_controls(names: list[str], name_re: Any) -> None:
-    """Fire both matchers on synthetic input before a clean scan is believed.
+def fired(
+    rule: str, text: str, name_re: Any = None, phrases: tuple[str, ...] = ()
+) -> bool:
+    """Whether one named rule produced a hit on text.
+
+    The rule is checked rather than the hit list: a control line for the URL
+    rule carries an address literal too, so a non-empty list proves only that
+    some matcher fired.
+    """
+    return any(r == rule for _n, _h, r in tree_hits(text, name_re, phrases))
+
+
+def scan_controls(
+    names: list[str], name_re: Any, phrases: tuple[str, ...] = ()
+) -> None:
+    """Fire every live matcher on synthetic input before a clean scan is believed.
 
     A tree holding nothing and a matcher matching nothing print the same
-    result. The control lines are built here and never written to a file.
+    result. The control lines are built here and never written to a file. One
+    control per rule: neutering a single matcher left the run green on two of
+    the three rules the CI run relies on before these were added.
     """
     address = str(next(n for n in TREE_NETS if n.version == 4).network_address + 1)
     check(
-        tree_hits(f"control line naming {address}") != [],
+        fired(RULE_ADDRESS, f"control line naming {address}"),
         f"the {RULE_ADDRESS} rule did not match {disclose(address)}, an "
         "address it refuses, so a clean scan says nothing about the addresses "
         "in this repository",
     )
+    check(
+        fired(RULE_URL, f"control line naming http://{address}:3000/x"),
+        f"the {RULE_URL} rule did not match a URL on {disclose(address)}, a "
+        "host it refuses, so a clean scan says nothing about the URLs in this "
+        "repository",
+    )
+    suffix_host = "control-line" + PRIVATE_SUFFIXES[0]
+    check(
+        fired(RULE_SUFFIX, f"control line naming {suffix_host}"),
+        f"the {RULE_SUFFIX} rule did not match {suffix_host}, a name it "
+        "refuses, so a clean scan says nothing about the private suffixes in "
+        "this repository",
+    )
+    if phrases:
+        check(
+            fired(RULE_PHRASE, f"control line quoting {phrases[0]}", None, phrases),
+            f"the {RULE_PHRASE} rule did not match {disclose(phrases[0])}, a "
+            "phrase it was given, so a clean scan says nothing about the "
+            "phrases in this repository",
+        )
     if not names:
         return
     check(
-        tree_hits(f"control line naming {names[0]}-ci", name_re) != [],
+        fired(RULE_NAME, f"control line naming {names[0]}-ci", name_re),
         f"the {RULE_NAME} rule did not match {disclose(names[0])}, a name it "
         "was given, so a clean scan says nothing about the names in this "
         "repository",
@@ -720,22 +813,32 @@ def scan_controls(names: list[str], name_re: Any) -> None:
 # ref reaches. A force-push replaces the branch and leaves the objects behind,
 # and a forge serves an unreachable commit by its SHA, so an orphan is
 # published while every HEAD-scoped and ref-scoped check reports clean. This
-# pass runs the same matchers over every blob and commit message in the
-# object database.
+# pass runs the same address matchers over every blob and commit message in
+# the object database.
+#
+# The pass is scoped to the objects this database holds. A CI checkout holds
+# the objects its refs reach and no orphan, so the orphan case is caught in a
+# clone of the forge or in the forge's own object database and not in CI.
+# Measured 2026-09-16 at 54a58db: the authoring clone reads 365 objects and
+# refuses 8 that no ref reaches, and a clone of the same HEAD over the git
+# transport reads 326 and refuses none.
 #
 # Objects whose hits are the pinned address table itself, by SHA and reason.
 # A version of tools/_netblocks.py is exempt by its name in the tree instead,
-# so a later edit to that file needs no entry here.
+# so a later edit to that file needs no entry here. Every entry here is a
+# commit message: an exemption by SHA blinds the whole object, so a host-scoped
+# entry in REPO_ALLOWED_HOSTS is preferred wherever the hit is an address a
+# file may hold.
 SCAN_EXEMPT_OBJECTS = {
-    # commit message stating the CIDRs the tree scan pins and the outside
-    # address it was measured with
+    # commit message stating the CIDRs the tree scan pins, plus one gateway
+    # address inside one of them that the measurement it records used
     "10e8e867df6cb1d41b76ef236a496dcaa5092afe": "development-host refusal",
     # commit message stating the CIDRs the manifest URL rule pins
     "e3892ca20b494039a6678e51bfe9b8c7e1330ad9": "manifest URL refusal",
     # commit message quoting the address its own measurement was made with.
-    # Reachable from main, so it is in every clone, and commit messages are
-    # not rewritten here. The address is published already; the exemption
-    # records that rather than implying the scan found nothing.
+    # Reachable from main and not from the published head, so the address is
+    # unpublished and a message rewrite has to reach it before the first push.
+    # The exemption records that rather than implying the scan found nothing.
     "231bc1d4677d76a5585f2d033bd638a42d5818c7": "object-database scan measurement",
 }
 # A blob above this is not prose. The largest text object in this repository
@@ -819,8 +922,10 @@ def refuse_truncated_history(records: list[tuple[str, str, bytes]]) -> None:
     `actions/checkout` fetches depth 1 by default. That database holds the tip
     commit and no other commit message, so every message below the tip passes
     unread and the run is a clean result computed from objects it never saw.
-    Measured 2026-09-16: a `--depth 1` clone of this repository scans 51
-    objects and exits 0; a full clone of the same HEAD scans 347 and exits 1.
+    The measurement that motivated this guard was read before it existed: a
+    `--depth 1` clone scanned 51 objects and exited 0. Measured again at
+    54a58db with the guard in place: the `--depth 1` clone scans 51 objects and
+    exits 1 here, and a full clone of the same HEAD scans 326 and exits 0.
     """
     check(
         git_line("rev-parse", "--is-shallow-repository") != "true",
@@ -838,7 +943,19 @@ def refuse_truncated_history(records: list[tuple[str, str, bytes]]) -> None:
 
 
 def scan_object_database(name_re: Any = None) -> None:
-    """Refuse a development host in any object this clone can serve by SHA."""
+    """Refuse a development host in any object this clone can serve by SHA.
+
+    The SHA of a matching object is withheld under CI. It is a complete
+    retrieval key on a public repository - `git cat-file -p` in any clone, and
+    the REST blob endpoint with no clone at all - so printing it beside a
+    withheld string publishes what the string was withheld for. The number of
+    failure lines is the number of matching objects; a maintainer reads the
+    SHAs from a local run.
+
+    The unread objects are counted beside the read ones. A count of what was
+    scanned reads as coverage on its own, and a binary blob or an oversized one
+    leaves the pass silently.
+    """
     records = object_records()
     if records is None:
         notes.append("git not available - the object database was not scanned")
@@ -846,36 +963,63 @@ def scan_object_database(name_re: Any = None) -> None:
     refuse_truncated_history(records)
     exempt = netblock_blobs(records) | set(SCAN_EXEMPT_OBJECTS)
     seen = 0
+    binary = 0
+    oversized = 0
     for sha, kind, body in records:
         if kind not in ("blob", "commit") or sha in exempt:
             continue
         if len(body) > MAX_SCANNED_OBJECT:
+            oversized += 1
             continue
         try:
             text = body.decode("utf-8")
         except UnicodeDecodeError:
+            binary += 1
             continue
         seen += 1
         found = tree_hits(text, name_re)
         if found:
-            fired = sorted({rule for _n, _h, rule in found})
-            rules = ", ".join(fired)
-            noun = "rule" if len(fired) == 1 else "rules"
+            rules_fired = sorted({rule for _n, _h, rule in found})
+            rules = ", ".join(rules_fired)
+            noun = "rule" if len(rules_fired) == 1 else "rules"
             hosts = ", ".join(sorted({disclose(host) for _n, host, _r in found}))
             failures.append(
-                f"{kind} {sha} matched the {rules} {noun} on {hosts} - the "
-                "object database serves it by SHA whether or not a ref "
+                f"{kind} {disclose(sha)} matched the {rules} {noun} on {hosts}"
+                " - a forge serves an object by SHA whether or not a ref "
                 "reaches it"
             )
     check(seen > 0, "the object-database scan read no objects, so it proved nothing")
-    notes.append(f"{seen} objects scanned in the object database")
+    notes.append(
+        f"{seen} objects scanned in the object database, {binary} skipped as "
+        f"non-text, {oversized} over the {MAX_SCANNED_OBJECT} byte limit"
+    )
     notes.append(
         f"{len(exempt)} objects exempt from the object scan by SHA or by file name"
     )
 
 
-def scan_published_tree(name_re: Any = None) -> None:
-    """Refuse a development host anywhere in the published tree."""
+def refuse_unpublished_paths() -> None:
+    """Refuse a working-copy-only path that has reached git's index.
+
+    An ignore rule cannot do this job. .gitignore ships, so its rules describe
+    the files they hide, and a rule moved to .git/info/exclude protects the one
+    machine holding that file and no clone. This check is in the tree, so it
+    travels.
+    """
+    listing = git_line("ls-files", "--cached")
+    if listing is None:
+        notes.append("git not available - the index was not read for staged notes")
+        return
+    for path in listing.splitlines():
+        if path.startswith(UNPUBLISHED_PATHS) or path in UNPUBLISHED_PATHS:
+            failures.append(
+                f"{path} is tracked; it is a working-copy path and a clone "
+                "must not carry it"
+            )
+
+
+def scan_published_tree(name_re: Any = None, phrases: tuple[str, ...] = ()) -> None:
+    """Refuse a development host or infrastructure phrase in the published tree."""
     exempt = os.path.join(ROOT, *SCAN_EXEMPT[0].split("/"))
     if os.path.isfile(exempt):
         allowed_names = {"TREE_CIDRS", "MANIFEST_ONLY_CIDRS", "PRIVATE_SUFFIXES"}
@@ -903,11 +1047,16 @@ def scan_published_tree(name_re: Any = None) -> None:
         except OSError, UnicodeDecodeError:
             continue
         seen += 1
-        for number, host, rule in tree_hits(text, name_re):
+        for number, host, rule in tree_hits(text, name_re, phrases):
+            tail = (
+                "that phrase names this network's own infrastructure and "
+                "belongs in a maintainer record"
+                if rule == RULE_PHRASE
+                else "that host is on the development network and means "
+                "nothing to a user who installs this"
+            )
             failures.append(
-                f"{path}:{number} matched the {rule} rule on {disclose(host)} - "
-                "that host is on the development network and means nothing to "
-                "a user who installs this"
+                f"{path}:{number} matched the {rule} rule on {disclose(host)} - {tail}"
             )
     check(seen > 0, "the published-tree scan read no files, so it proved nothing")
 
@@ -1180,20 +1329,30 @@ def main() -> int:
     # file is the disclosure these scans exist to prevent. Both scans get them.
     dev_names = internal_names()
     dev_name_re = name_matcher(dev_names)
-    if dev_names:
-        plural = "" if len(dev_names) == 1 else "s"
-        notes.append(
-            f"{len(dev_names)} development host name{plural} given to the scans"
+    dev_phrases = tuple(internal_phrases())
+    for kind, values, env, path in (
+        ("development host name", dev_names, DEV_HOST_ENV, DEV_HOST_FILE),
+        ("infrastructure phrase", dev_phrases, DEV_PHRASE_ENV, DEV_PHRASE_FILE),
+    ):
+        if values:
+            plural = "" if len(values) == 1 else "s"
+            notes.append(f"{len(values)} {kind}{plural} given to the scans")
+            continue
+        # Under CI this half has no input by design and the note says so. Off
+        # CI it is a failure: a maintainer's clean exit has to mean the half
+        # ran, and a note is what an absent input looked like while the name
+        # half silently covered nothing.
+        message = (
+            f"no {kind}s given to the scans, so that half did not run; set "
+            f"{env}, or write {path}, to run it"
         )
-    else:
-        notes.append(
-            "no development host names given to the scans, so their name half "
-            "did not run and this result covers addresses and URLs only; set "
-            f"{DEV_HOST_ENV}, or write {'/'.join(DEV_HOST_FILE)}, to run the "
-            "name half"
-        )
-    scan_controls(dev_names, dev_name_re)
-    scan_published_tree(dev_name_re)
+        if redacting():
+            notes.append(f"{message}, and read this result as covering the rest")
+        else:
+            failures.append(message)
+    refuse_unpublished_paths()
+    scan_controls(dev_names, dev_name_re, dev_phrases)
+    scan_published_tree(dev_name_re, dev_phrases)
     scan_object_database(dev_name_re)
 
     # ---------------------------------------------------------- syntax

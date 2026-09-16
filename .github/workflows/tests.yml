@@ -52,7 +52,15 @@ jobs:
       # secret expands to the empty string, which is the same as omitting the
       # variable while reading as coverage. A defined one would put the name
       # into a public run log the first time the name half matched, which is
-      # the disclosure the scan exists to prevent. This run covers the address
-      # literals, the URL hosts and the bare private host names; the name half
-      # runs locally, where the names already are.
+      # the disclosure the scan exists to prevent. HA_DEV_PRIVATE_PHRASES is
+      # absent for the same reason.
+      #
+      # This run covers the address literals, the URL hosts and the bare
+      # private host names, and each of those three rules has a synthetic
+      # control that turns the run red when its matcher stops matching. The
+      # name half and the phrase half run locally, where their inputs are.
+      #
+      # The object-database pass here reads the objects this checkout's refs
+      # reach. An object no ref reaches is not fetched, so the orphan case
+      # that pass exists for is caught in a clone of the forge and not here.
       - run: .venv/bin/python tools/validate_local.py

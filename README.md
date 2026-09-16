@@ -480,29 +480,54 @@ space, the brand images against their required sizes, `PARALLEL_UPDATES` on
 every platform, no `_attr_name` or `_attr_icon` left anywhere, the quality
 scale complete, every rule filed `done` against the mechanism it would need
 to be true, every text file `git ls-files` reports against the development
-addresses and host names the scans refuse, and every blob and commit message
-in the object database against the same matchers.
+addresses, host names and infrastructure phrases the scans refuse, every blob
+and commit message in the object database against the same address matchers,
+and `git ls-files --cached` against the paths a clone must never carry.
 
-The host-name half of both scans needs names from outside the tree, because
-naming them in a published file is the disclosure the scans exist to prevent.
-`HA_DEV_HOST_NAMES` carries them, comma or whitespace separated or as the path
-of a file listing them; with the variable unset the validator reads
-`docs/local/dev-hosts.txt`, which is excluded from the tree. Neither source
-supplying a name is a note, not a failure, and the note names the variable
-that would run the name half, so a run covering addresses and URLs only cannot
-read as a run that found nothing. The object-database scan refuses a shallow
-clone for the same reason: a depth-1 checkout holds one commit object, so
-every message below the tip goes unread.
+The host-name and phrase halves need their input from outside the tree,
+because writing it into a published file is the disclosure the scans exist to
+prevent.
 
-No workflow supplies the names, so the name half is a local check.
+| Half | Variable | File read when the variable is unset |
+| --- | --- | --- |
+| Development host names | `HA_DEV_HOST_NAMES` | `~/.config/ha-dev-hosts.txt` |
+| Infrastructure phrases | `HA_DEV_PRIVATE_PHRASES` | `~/.config/ha-dev-phrases.txt` |
+
+Either variable holds the values directly or holds the path of a file listing
+them. Both fallback paths are outside every clone, so no clone can stage the
+input and nothing here asks a reader to create a file inside the tree. An
+in-tree fallback was the previous design: git ignored that path through
+`.git/info/exclude`, which no clone receives, so in a fresh clone the file the
+fallback asked for was a staged file and a scan failure.
+
+An absent input is a failure off CI, so a clean local exit means the half ran.
+Under `CI` it is a note naming the variable, because no workflow supplies
+either input. The object-database scan refuses a shallow clone for the same
+reason: a depth-1 checkout holds one commit object, so every message below the
+tip goes unread.
 
 | Half | Where it runs | Observed 2026-09-16 |
 | --- | --- | --- |
-| Address literals, URL hosts, bare private host names, and the control proving the address rule fired | CI and locally | A clone with no name input and `CI=true` exits 0 and prints the note naming `HA_DEV_HOST_NAMES` |
+| Address literals, URL hosts, bare private host names, and one control per rule | CI and locally | A clone with no name input and `CI=true` exits 0 and prints the note naming `HA_DEV_HOST_NAMES`; the same clone with any one of the three matchers replaced by one that matches nothing exits 1 on that rule's control |
 | Development host names, and the control proving the name rule fired | Locally only | The same clone with `HA_DEV_HOST_NAMES` set to a name the tree carries exits 1 and reports the file, the line and the rule |
+| Infrastructure phrases, and the control proving the phrase rule fired | Locally only | The same clone with `HA_DEV_PRIVATE_PHRASES` set to a phrase appended to `README.md` exits 1 and reports the file, the line and the rule |
 
 A development host name written into the tree is caught by the run a
 maintainer makes before pushing, and by nothing in CI.
+
+The phrase half covers prose that names private CI topology, account structure
+or lab tooling and contains no host, no address and no private suffix, which is
+a class no address matcher can see. It reads the published tree only. The
+object database holds commit messages of that class which no rewrite here can
+reach, so a matcher over them would refuse history rather than the next commit.
+
+`.gitignore` cannot keep a working-copy path out of a clone: the ignore file
+ships, so its rules describe the files they hide, and a rule moved to
+`.git/info/exclude` protects the one machine that holds the file.
+`refuse_unpublished_paths` fails instead when `.claude/`, `.cursorrules`,
+`AGENTS.md`, `CLAUDE.md` or `docs/local/` is tracked, and that check travels
+with the tree. The tree scan skips `docs/local/`, so a maintainer's notes
+beside the repository are neither read nor named in a failure.
 
 A matched string is printed locally, because it is what the maintainer greps
 for, and withheld when `CI` or `GITHUB_ACTIONS` is set to anything but `0` or
@@ -511,15 +536,28 @@ Nothing derived from the string is printed: a truncated digest of a short host
 name is confirmable against a candidate list. The environment decides rather
 than a flag, because a workflow that forgot the flag would publish the string.
 
+The object scan withholds the matching object's SHA under the same rule. A SHA
+is a complete retrieval key on a public repository, through `git cat-file -p`
+in any clone and through the REST blob endpoint with no clone at all, so
+printing it beside a withheld string publishes what the string was withheld
+for. The number of failure lines is the number of matching objects, and a
+maintainer reads the SHAs from a local run.
+
+The object scan counts what it did not read beside what it did: a blob that is
+not UTF-8 and a blob over the size limit leave the pass without a hit, and a
+count of scanned objects alone reads as coverage.
+
 No repository secret carries the names in. An undefined secret expands to the
 empty string, which reads as coverage and is not, and a defined one would put
 the name into the public run log the first time the name half matched.
 
-One commit message reachable from `main` quotes an address in the refused
-space, in the measurement that commit records. Commit messages are not
-rewritten here, so the object scan exempts that object by SHA with its reason
-on its line, and prints a count of the objects it exempts so the hole is
-visible in the run.
+Three commit messages reachable from `main` quote addresses in the refused
+space, in the measurements those commits record. Commit messages are not
+rewritten here, so the object scan exempts those objects by SHA with the
+reason on each line, and prints a count of the objects it exempts so the hole
+is visible in the run. None of the three is in the published history, so each
+address is still unpublished and a message rewrite has to reach it before the
+first push.
 
 `python tools/make_brand.py` regenerates `custom_components/sleepiq_massage/brand/`
 and measures what it wrote.
