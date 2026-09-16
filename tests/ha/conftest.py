@@ -1,9 +1,9 @@
 """Fixtures for the Home Assistant layer tests.
 
 These run against Home Assistant. CI runs them on Linux. On a Windows
-workstation two things are shimmed below, and tests/winposix.py stands in for
-the POSIX modules Home Assistant imports before any conftest is loaded; all
-three are needed for the suite to run there. They skip when the harness is
+workstation tests/winposix.py supplies every shim the suite needs: the POSIX
+modules Home Assistant imports before any conftest is loaded, and the two
+HA-layer shims installed by the call below. They skip when the harness is
 absent, so the pure suite one level up still runs on a bare checkout.
 
 This conftest lives in its own directory because its autouse fixture pulls in
@@ -18,11 +18,8 @@ the account's bed list and the massage endpoint.
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Generator
 from copy import deepcopy
-import socket
-import sys
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, create_autospec, patch
 
@@ -45,30 +42,9 @@ from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.sleepiq_massage.const import DOMAIN
+from tests.winposix import install_ha_layer_shims
 
-if sys.platform == "win32":
-    # ProactorEventLoop builds its self-pipe from socket.socketpair(), which
-    # the harness's socket block refuses, so every test errors before it runs.
-    # Hand socketpair the real socket class for the length of that one call;
-    # every other socket stays blocked, here and on the Linux CI runner.
-    _REAL_SOCKET = socket.socket
-    _REAL_SOCKETPAIR = socket.socketpair
-
-    def _unguarded_socketpair(*args: Any, **kwargs: Any) -> Any:
-        guarded = socket.socket
-        socket.socket = _REAL_SOCKET
-        try:
-            return _REAL_SOCKETPAIR(*args, **kwargs)
-        finally:
-            socket.socket = guarded
-
-    socket.socketpair = _unguarded_socketpair
-
-    # aiodns, which aiohttp resolves with, refuses to run on the Proactor loop
-    # Home Assistant picks on Windows. The selector loop runs the same tests.
-    from homeassistant import runner
-
-    runner.HassEventLoopPolicy._loop_factory = asyncio.SelectorEventLoop
+install_ha_layer_shims()
 
 BED_ID = "123456"
 BED_NAME = "Test Bed"
