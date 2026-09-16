@@ -1,7 +1,7 @@
 """Define constants for the SleepIQ component."""
 
 DATA_SLEEPIQ = "data_sleepiq"
-DOMAIN = "sleepiq"
+DOMAIN = "sleepiq_massage"
 
 ACTUATOR = "actuator"
 CORE_CLIMATE_TIMER = "core_climate_timer"

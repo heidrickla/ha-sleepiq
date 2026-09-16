@@ -1,6 +1,6 @@
 # Ruff config for a repo that VENDORS Home Assistant core code.
 #
-# custom_components/sleepiq/ is a copy of homeassistant/components/sleepiq/ at
+# custom_components/sleepiq_massage/ is a copy of homeassistant/components/sleepiq/ at
 # tag 2026.8.2 plus massage support. Core formats its imports under its own
 # isort settings, so linting those files with ruff's defaults reports I001 on
 # code this project did not write and must not reformat.

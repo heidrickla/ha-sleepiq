@@ -30,6 +30,8 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # This shadows core's sleepiq, whose brand assets live in the core
-          # half of home-assistant/brands. HACS only checks the custom half.
+          # Brand art ships in custom_components/sleepiq_massage/brand/, which
+          # Home Assistant serves at /api/brands/integration/<domain>/<file>.
+          # The action's brands check reads home-assistant/brands, where this
+          # project does not register.
           ignore: brands

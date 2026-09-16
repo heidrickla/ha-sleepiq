@@ -44,7 +44,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.sleepiq.const import DOMAIN
+from custom_components.sleepiq_massage.const import DOMAIN
 
 if sys.platform == "win32":
     # ProactorEventLoop builds its self-pipe from socket.socketpair(), which
@@ -123,7 +123,7 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 def mock_setup_entry() -> Generator[AsyncMock]:
     """Override async_setup_entry."""
     with patch(
-        "custom_components.sleepiq.async_setup_entry", return_value=True
+        "custom_components.sleepiq_massage.async_setup_entry", return_value=True
     ) as mock_setup_entry:
         yield mock_setup_entry
 
@@ -270,7 +270,7 @@ def mock_asyncsleepiq(
     go through client.get and writes through client.put, all recorded here
     rather than sent. init_beds() re-reads the account, as the library's does.
     """
-    with patch("custom_components.sleepiq.AsyncSleepIQ", autospec=True) as mock:
+    with patch("custom_components.sleepiq_massage.AsyncSleepIQ", autospec=True) as mock:
         client = mock.return_value
         client.beds = dict(account)
 
@@ -309,7 +309,7 @@ async def setup_platform(
     mock_entry.add_to_hass(hass)
 
     if platforms is not None:
-        with patch("custom_components.sleepiq.PLATFORMS", platforms):
+        with patch("custom_components.sleepiq_massage.PLATFORMS", platforms):
             assert await async_setup_component(hass, DOMAIN, {})
         await hass.async_block_till_done()
 

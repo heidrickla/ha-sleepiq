@@ -24,7 +24,7 @@ import sys
 from typing import Any
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-DOMAIN = "sleepiq"
+DOMAIN = "sleepiq_massage"
 COMP = os.path.join(ROOT, "custom_components", DOMAIN)
 BASELINE = os.path.join(ROOT, "docs", "UPSTREAM-BASELINE.txt")
 PLATFORMS = ("binary_sensor", "button", "light", "number", "select", "sensor", "switch")

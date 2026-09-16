@@ -57,6 +57,6 @@ capture at all.
 
 ## Fixing it, once the request is known
 
-`custom_components/sleepiq/massage.py`, `SleepIQMassage.set_mode()`. It is a
+`custom_components/sleepiq_massage/massage.py`, `SleepIQMassage.set_mode()`. It is a
 one-line change to the payload in `self._put({...})`. Everything else -
 entities, translations, state model, timer defaulting - is already in place.
