@@ -488,10 +488,38 @@ naming them in a published file is the disclosure the scans exist to prevent.
 `HA_DEV_HOST_NAMES` carries them, comma or whitespace separated or as the path
 of a file listing them; with the variable unset the validator reads
 `docs/local/dev-hosts.txt`, which is excluded from the tree. Neither source
-supplying a name is a failure, so a run whose name half matched nothing cannot
+supplying a name is a note, not a failure, and the note names the variable
+that would run the name half, so a run covering addresses and URLs only cannot
 read as a run that found nothing. The object-database scan refuses a shallow
 clone for the same reason: a depth-1 checkout holds one commit object, so
 every message below the tip goes unread.
+
+No workflow supplies the names, so the name half is a local check.
+
+| Half | Where it runs | Observed 2026-09-16 |
+| --- | --- | --- |
+| Address literals, URL hosts, bare private host names, and the control proving the address rule fired | CI and locally | A clone with no name input and `CI=true` exits 0 and prints the note naming `HA_DEV_HOST_NAMES` |
+| Development host names, and the control proving the name rule fired | Locally only | The same clone with `HA_DEV_HOST_NAMES` set to a name the tree carries exits 1 and reports the file, the line and the rule |
+
+A development host name written into the tree is caught by the run a
+maintainer makes before pushing, and by nothing in CI.
+
+A matched string is printed locally, because it is what the maintainer greps
+for, and withheld when `CI` or `GITHUB_ACTIONS` is set to anything but `0` or
+`false`. The file, the line and the rule that fired are kept either way.
+Nothing derived from the string is printed: a truncated digest of a short host
+name is confirmable against a candidate list. The environment decides rather
+than a flag, because a workflow that forgot the flag would publish the string.
+
+No repository secret carries the names in. An undefined secret expands to the
+empty string, which reads as coverage and is not, and a defined one would put
+the name into the public run log the first time the name half matched.
+
+One commit message reachable from `main` quotes an address in the refused
+space, in the measurement that commit records. Commit messages are not
+rewritten here, so the object scan exempts that object by SHA with its reason
+on its line, and prints a count of the objects it exempts so the hole is
+visible in the run.
 
 `python tools/make_brand.py` regenerates `custom_components/sleepiq_massage/brand/`
 and measures what it wrote.

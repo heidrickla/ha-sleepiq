@@ -71,6 +71,25 @@ Newest first, in the style of
   in-form error and not for an abort, so the reason resolved to no string.
   Both are now declared under `config.abort` as well, in `strings.json` and
   `translations/en.json`. Core's `sleepiq` has the same gap at 2026.8.3.
+- The Tests workflow no longer passes `HA_DEV_HOST_NAMES` from a repository
+  secret, and no longer fails when nothing supplies the names. No such secret
+  exists; an undefined secret expands to the empty string, so the step behaved
+  exactly as if the line were absent while reading as coverage, and the
+  validator's refusal of an empty input turned the job red on its first push.
+  A defined secret would have been worse: the first match inside a job would
+  have published the name in a public run log, which is what the scan exists
+  to prevent, and Actions masks a secret's exact value while the name matcher
+  deliberately matches a longer word, so the string reaching the log is the one
+  masking misses.
+- No report of a matched host prints the host when `CI` or `GITHUB_ACTIONS` is
+  set. `disclose()` keeps the string locally, where it is what the maintainer
+  greps for, and replaces it in CI; the file, the line and the rule that fired
+  are kept either way, because `tree_hits()` returns the rule with each hit.
+  Applied at the published-tree scan, the object-database scan, both matcher
+  controls and the manifest URL refusal. Nothing derived from the string is
+  printed either: a truncated digest of a short host name is confirmable
+  against a candidate list. The environment decides rather than a flag, because
+  a workflow that forgot the flag would publish the string.
 
 ### Development
 
@@ -90,17 +109,19 @@ Newest first, in the style of
   when the variable is unset. Both scans refuse each name with any trailing
   word characters. The names are never written into the tree, because that is
   the disclosure the scans exist to prevent. Neither source supplying a name is
-  a failure, not a note, so a run whose name half matched nothing cannot read
-  as a run that found nothing, and `scan_controls` fires both matchers on
-  synthetic input so a clean result is never a broken matcher. The Tests
-  workflow passes the names in from the `HA_DEV_HOST_NAMES` repository secret.
-  Measured on a clone of this tree: the variable unset and a development name
-  in `README.md`, exit 1 on the missing-names failure; the variable set with
-  the same file, exit 1 naming `README.md` and the line; the matcher replaced
-  with one that matches nothing, exit 1 on the control. Measured 2026-09-16 on
-  this clone: the variable unset and `docs/local/dev-hosts.txt` in place, the
-  note reads two names; the file moved aside, exit 1 on the missing-names
-  failure.
+  a note, not a failure, and the note names the variable that would run the
+  name half, so a run covering addresses and URLs only cannot read as a run
+  that found nothing. `scan_controls` fires both matchers on synthetic input so
+  a clean result is never a broken matcher. No workflow supplies the names, so
+  the name half is a local check; a matched string is printed locally and
+  withheld when `CI` or `GITHUB_ACTIONS` is set. Measured 2026-09-16 on a clone
+  fetched over the wire, which carries the objects a ref reaches as a checkout
+  does: `CI` and `GITHUB_ACTIONS` set with no name input, exit 0 and the note;
+  a development name added to `README.md` with the variable set to it, exit 1
+  reporting the file, the line and the rule with the string withheld; the same
+  off CI, exit 1 with the string printed; the address matcher replaced with one
+  that matches nothing, exit 1 on its control; the name matcher likewise, exit
+  1 on its control; the pristine tree with the real names supplied, exit 0.
 - `const.VERSION` joins `manifest.json` and `pyproject.toml` as a third
   version field, and the validator refuses a mismatch between any of them.
 - `.html` joins `PUBLISHED_SUFFIXES`, so an HTML file added to the tree is
@@ -115,8 +136,13 @@ Newest first, in the style of
   message in `git cat-file --batch-all-objects`. The tree scan reads the index,
   so an object no ref reaches passes it, and a forge serves an unreachable
   commit by its SHA. A version of `tools/_netblocks.py` is skipped by its name
-  in the tree; two commit messages that state the pinned CIDRs are skipped by
-  SHA in `SCAN_EXEMPT_OBJECTS`.
+  in the tree; three commit messages that quote an address in the refused
+  space are skipped by SHA in `SCAN_EXEMPT_OBJECTS`, each with its reason on
+  its line. Two of them state the pinned CIDRs; the third records the
+  measurement the object scan was built from and is reachable from `main`, so
+  it is in every clone and commit messages are not rewritten here. The scan
+  prints how many objects it exempts, so the hole is visible in the run rather
+  than implied by a clean result.
 - The object-database scan refuses a clone too shallow to scan. A clone carries
   the commits a ref reaches, not every object the authoring clone holds, and
   `actions/checkout` fetches depth 1 by default, which holds the tip commit
