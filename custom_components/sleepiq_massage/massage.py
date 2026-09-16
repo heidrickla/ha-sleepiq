@@ -58,7 +58,7 @@ def _coerce[_EnumT: (Speed, Mode)](
     """
     try:
         return enum_cls(int(raw))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         _LOGGER.debug("Unexpected %s value from SleepIQ: %r", enum_cls.__name__, raw)
         return default
 
@@ -107,7 +107,7 @@ class SleepIQMassage:
         self.mode = _coerce(Mode, block.get("waveMode"), Mode.OFF)
         try:
             self.timer = int(block.get("massageTimer") or 0)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self.timer = 0
 
     async def _put(self, data: dict[str, Any]) -> None:
