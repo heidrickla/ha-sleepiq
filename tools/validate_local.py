@@ -396,7 +396,7 @@ ALLOWED_HOSTS = frozenset(
 # Text that ships to whoever clones or installs the repository. The file list
 # comes from git rather than a walk: git already knows what is ignored, which
 # is how private operational notes under an ignored directory stay out, and
-# --others adds a file staged for this commit but not yet added.
+# --others adds a file created for this commit and not yet staged.
 PUBLISHED_SUFFIXES = {
     ".cfg",
     ".ini",
@@ -413,7 +413,6 @@ PUBLISHED_NAMES = {
     ".gitignore",
     "CODEOWNERS",
     "LICENSE",
-    "LICENSE-APACHE",
     "NOTICE",
 }
 # The one published file the scan skips: it holds the CIDRs the scan matches
@@ -505,9 +504,8 @@ def unreachable_host(url: str) -> str | None:
 def malformed_url(url: Any) -> bool:
     """A manifest URL that is not an absolute http(s) URL with a host.
 
-    Kept because envisalink's superseded helper refused a hostless string and
-    unreachable_host cannot: its answer is a host or None, and "not-a-url" has
-    no host to report.
+    unreachable_host answers with a host or None, and "not-a-url" has no host
+    to report.
     """
     if not isinstance(url, str) or not url:
         return True
