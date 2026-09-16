@@ -6,12 +6,16 @@ and Home Assistant serves the files at
 /api/brands/integration/<domain>/<file> - the middle `integration/` segment is
 required.
 
-Sizes are exact requirements, not suggestions:
+| File        | Written at | Checked below | HACS store accepts   |
+| ----------- | ---------- | ------------- | -------------------- |
+| icon.png    | 256x256    | 256x256       | 256x256              |
+| icon@2x.png | 512x512    | 512x512       | 512x512              |
+| logo.png    | 512x256    | 512x256       | short side 128 - 256 |
+| logo@2x.png | 1024x512   | 1024x512      | short side 256 - 512 |
 
-    icon.png       256x256 exactly
-    icon@2x.png    512x512 exactly
-    logo.png       shortest side 128-256
-    logo@2x.png    shortest side 256-512
+The check below is the exact size, not the store's range, so a file that drifts
+off what this script writes fails here as well as in
+tools/validate_local.py, which measures the same four sizes independently.
 
 The mark is what the integration does: a bed seen from the side, with the
 motion arcs of a massage running out of both ends. Palette and geometry match
@@ -124,20 +128,16 @@ def main() -> None:
     for name, size in SPECS.items():
         render(size).save(os.path.join(out, name), "PNG", optimize=True)
 
-    # Verify against the published rules rather than trusting the calls above:
-    # the sizes, a transparent background, and a mark that fills the square
-    # rather than floating in it.
+    # Reopen each file rather than trusting the calls above: the exact size, a
+    # transparent background, and a mark that fills the box rather than
+    # floating in it.
     ok = True
     for name, (want_w, want_h) in SPECS.items():
         path = os.path.join(out, name)
         with Image.open(path) as im:
             w, h = im.size
             alpha = im.convert("RGBA").getchannel("A")
-        if name.startswith("icon"):
-            good = (w, h) == (want_w, want_h)
-        else:
-            short = min(w, h)
-            good = (256 <= short <= 512) if "@2x" in name else (128 <= short <= 256)
+        good = (w, h) == (want_w, want_h)
         corners = [alpha.getpixel(p) for p in ((0, 0), (w - 1, 0), (0, h - 1))]
         transparent = all(a == 0 for a in corners)
         left, top, right, bottom = alpha.getbbox() or (0, 0, 0, 0)
