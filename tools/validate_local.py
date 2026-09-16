@@ -358,6 +358,7 @@ def missing_evidence(manifest: dict[str, Any]) -> dict[str, str]:
 REPO_ALLOWED_HOSTS = frozenset(
     {
         "10.0.0.5",  # a bed gateway address in tests/ha/test_config_flow.py
+        "10.0.0.6",  # a second bed's address in tests/ha/test_config_flow.py
         "192.168.0.5",  # a bed gateway address in tests/ha/test_massage_entities.py
     }
 )
