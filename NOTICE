@@ -44,8 +44,10 @@ mypy in strict mode does not accept either library's implicit re-exports.
   * config_flow.py   - masked password selector on every form, a DHCP
                        discovery step, a reconfigure flow
   * const.py         - massage entity type constants, translation keys, the
-                       repair issue key; core's ENTITY_TYPES name table and
-                       icon constants dropped with the hard-coded names
+                       repair issue key, the version constant the local
+                       validator cross-checks against manifest.json; core's
+                       ENTITY_TYPES name table and icon constants dropped with
+                       the hard-coded names
   * coordinator.py   - fetch massage state on each refresh, translated poll
                        exceptions, login failure raised as ConfigEntryAuthFailed,
                        the account's bed list followed as beds are added and
