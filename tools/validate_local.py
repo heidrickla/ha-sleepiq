@@ -393,6 +393,40 @@ ALLOWED_HOSTS = frozenset(
     | REPO_ALLOWED_HOSTS
 )
 
+# Development host names are matched as well as addresses, and they cannot be
+# listed here: naming them in a published file is the disclosure this rule
+# exists to prevent. The environment carries them in from outside the tree.
+DEV_HOST_ENV = "HA_DEV_HOST_NAMES"
+
+
+def internal_names() -> list[str]:
+    """Development host names, from the environment, for the scans to refuse.
+
+    The variable holds the names comma or whitespace separated, or holds the
+    path of a file with one name per line and `#` starting a comment. Each
+    name matches with any trailing word characters, so a bare name also
+    catches the same name with a role or a number appended. No example name
+    is written here: this file is scanned too, and a literal example is a hit
+    the moment someone supplies that name.
+    """
+    raw = os.environ.get(DEV_HOST_ENV, "").strip()
+    if not raw:
+        return []
+    if os.path.isfile(raw):
+        raw = "\n".join(line.split("#", 1)[0] for line in read(raw).splitlines())
+    return sorted({n.strip().lower() for n in re.split(r"[,\s]+", raw) if n.strip()})
+
+
+def name_matcher(names: list[str]) -> Any:
+    """A regex matching any of names with any suffix. None when given none."""
+    if not names:
+        return None
+    return re.compile(
+        r"\b(?:" + "|".join(re.escape(n) for n in names) + r")\w*",
+        re.IGNORECASE,
+    )
+
+
 # Text that ships to whoever clones or installs the repository. The file list
 # comes from git rather than a walk: git already knows what is ignored, which
 # is how private operational notes under an ignored directory stay out, and
@@ -531,7 +565,7 @@ def published_files() -> list[str]:
             text=True,
             timeout=30,
         )
-    except (OSError, _subprocess.SubprocessError):
+    except OSError, _subprocess.SubprocessError:
         listing = None
     if listing is not None and listing.returncode == 0:
         paths = [p for p in listing.stdout.split("\0") if p]
@@ -587,6 +621,27 @@ def tree_hits(text: str, name_re: Any = None) -> list[tuple[int, str]]:
     return hits
 
 
+def scan_controls(names: list[str], name_re: Any) -> None:
+    """Fire both matchers on synthetic input before a clean scan is believed.
+
+    A tree holding nothing and a matcher matching nothing print the same
+    result. The control lines are built here and never written to a file.
+    """
+    address = str(next(n for n in TREE_NETS if n.version == 4).network_address + 1)
+    check(
+        tree_hits(f"control line naming {address}") != [],
+        f"the scans did not match {address}, an address they refuse, so a "
+        "clean scan says nothing about the addresses in this repository",
+    )
+    if not names:
+        return
+    check(
+        tree_hits(f"control line naming {names[0]}-ci", name_re) != [],
+        f"the scans did not match {names[0]}, a name they were given, so a "
+        "clean scan says nothing about the names in this repository",
+    )
+
+
 # ------------------------------------------------- object-database refusal
 # published_files() reads the index, so the tree scan cannot see an object no
 # ref reaches. A force-push replaces the branch and leaves the objects behind,
@@ -625,7 +680,7 @@ def object_records() -> list[tuple[str, str, bytes]] | None:
             capture_output=True,
             timeout=300,
         )
-    except (OSError, _subprocess.SubprocessError):
+    except OSError, _subprocess.SubprocessError:
         return None
     if proc.returncode != 0:
         return None
@@ -663,7 +718,7 @@ def netblock_blobs(records: list[tuple[str, str, bytes]]) -> set[str]:
     return shas
 
 
-def scan_object_database() -> None:
+def scan_object_database(name_re: Any = None) -> None:
     """Refuse a development host in any object this clone can serve by SHA."""
     records = object_records()
     if records is None:
@@ -681,7 +736,7 @@ def scan_object_database() -> None:
         except UnicodeDecodeError:
             continue
         seen += 1
-        hosts = sorted({host for _number, host in tree_hits(text)})
+        hosts = sorted({host for _number, host in tree_hits(text, name_re)})
         if hosts:
             failures.append(
                 f"{kind} {sha} names {', '.join(hosts)} - the object database "
@@ -691,7 +746,7 @@ def scan_object_database() -> None:
     notes.append(f"{seen} objects scanned in the object database")
 
 
-def scan_published_tree() -> None:
+def scan_published_tree(name_re: Any = None) -> None:
     """Refuse a development host anywhere in the published tree."""
     exempt = os.path.join(ROOT, *SCAN_EXEMPT[0].split("/"))
     if os.path.isfile(exempt):
@@ -710,21 +765,6 @@ def scan_published_tree() -> None:
                     "the tree scan skips this file, so nothing else may live in it"
                 )
                 break
-    # A repository that knows its own development host names - read from
-    # outside the tree, because naming them in a published file is the
-    # disclosure this rule exists to prevent - has them matched as well.
-    name_re = None
-    finder = globals().get("internal_names")
-    if callable(finder):
-        names = finder()
-        if names:
-            name_re = re.compile(
-                r"\b(?:" + "|".join(re.escape(n) for n in names) + r")\w*",
-                re.IGNORECASE,
-            )
-            notes.append(f"{len(names)} development host names given to the tree scan")
-        else:
-            notes.append("no development host names given to the tree scan")
     seen = 0
     for path in published_files():
         full = os.path.join(ROOT, *path.split("/"))
@@ -732,7 +772,7 @@ def scan_published_tree() -> None:
             continue
         try:
             text = read(full)
-        except (OSError, UnicodeDecodeError):
+        except OSError, UnicodeDecodeError:
             continue
         seen += 1
         for number, host in tree_hits(text, name_re):
@@ -1000,8 +1040,17 @@ def main() -> int:
                 not malformed_url(manifest.get(_key)),
                 f"manifest {_key} is not an absolute http(s) URL a user can open",
             )
-    scan_published_tree()
-    scan_object_database()
+    # The names come from outside the tree, because naming them in a published
+    # file is the disclosure these scans exist to prevent. Both scans get them.
+    dev_names = internal_names()
+    dev_name_re = name_matcher(dev_names)
+    notes.append(
+        f"{len(dev_names)} development host names given to the scans"
+        + ("" if dev_names else f" - set {DEV_HOST_ENV} to supply them")
+    )
+    scan_controls(dev_names, dev_name_re)
+    scan_published_tree(dev_name_re)
+    scan_object_database(dev_name_re)
 
     # ---------------------------------------------------------- syntax
     for dirpath, _dirs, files in os.walk(COMP):
