@@ -9,10 +9,13 @@ Newest first, in the style of
 
 - Breaking: the domain is now `sleepiq_massage`. 0.1.0 used `sleepiq`, which is
   a core integration's domain, and HACS excludes a custom integration that
-  overrides a core one. On the restart after this update, core's built-in
-  `sleepiq` takes over the 0.1.0 config entry and the massage entities
-  disappear. Add SleepIQ (with massage) from Add integration, then delete the
-  old entry if you want one set of entities. There is no migration: unique ids
+  overrides a core one. HACS installs this version into
+  `config/custom_components/sleepiq_massage` and leaves
+  `config/custom_components/sleepiq` on disk, where the 0.1.0 code keeps
+  shadowing core's built-in `sleepiq` and never updates again. Delete that
+  directory, restart, add SleepIQ (with massage) from Add integration, then
+  delete the old entry if you want one set of entities; README has the
+  sequence. There is no migration: unique ids
   under the new domain do not collide with core's, so both integrations can run
   side by side on the same account, with the second set's entity ids carrying a
   `_2` suffix. The deprecated YAML key moves with the domain, to
