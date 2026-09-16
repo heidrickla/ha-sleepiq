@@ -33,10 +33,15 @@ Newest first, in the style of
 
 - Brand art in `custom_components/sleepiq_massage/brand/`: `icon.png` 256x256,
   `icon@2x.png` 512x512, `logo.png` 512x256, `logo@2x.png` 1024x512.
-  `tools/make_brand.py` regenerates them and measures what it wrote.
+  `tools/make_brand.py` regenerates them and checks each file against the
+  exact size it wrote.
 
 ### Fixed
 
+- Selecting a massage mode no longer shows a 60 minute timer. A mode write
+  sends `waveMode` on its own and no `massageTimer`, so the entity was showing
+  a value the bed had not been given and the next poll replaced. A speed write
+  still sends 60 minutes when no timer is set.
 - The diagnostics download no longer carries the bed's name, which owners set
   to a room or a person, and no longer dumps `entry.data` wholesale, which
   would have shipped anything the deprecated YAML block put in the entry.
