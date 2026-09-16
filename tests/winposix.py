@@ -12,7 +12,7 @@ order:
 `use_selector_event_loop()` is a fourth shim and stops none of this suite.
 `aiodns`, which aiohttp resolves with, refuses the Proactor loop
 `homeassistant.runner` picks on Windows. Measured 2026-09-16 with the call
-replaced by a no-op and the loop factory left as `ProactorEventLoop`: 74
+replaced by a no-op and the loop factory left as `ProactorEventLoop`: 77
 passed, the same count as the pristine run. It guards the first test here that
 resolves a name.
 

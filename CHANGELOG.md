@@ -27,13 +27,27 @@ Newest first, in the style of
   the file-by-file split, including the four added files, which are MIT. The
   Apache text is not a second root `LICENSE-*` file because GitHub reports
   NOASSERTION for a root with two licence-named files and HACS fails on that.
-- `hacs.json` declares `"country": ["US"]`. Sleep Number sold through 570-plus
-  stores in the United States and sleepnumber.com and nowhere else as of
-  2026-09-16. Sleep Country Canada acquired the business in July 2026 and has
-  named a Canadian rollout as an option with no date; when Sleep Number products
-  reach Sleep Country or Dormez-vous, add CA. The key hides the store listing
-  from HACS users who have set a different country, which defaults to ALL, and
-  never affects an existing install.
+- `hacs.json` sets no `country`. The key filters the HACS store listing to the
+  countries it names and hides the repository from every viewer whose HACS
+  country is set to something else. The SleepIQ cloud is one global endpoint
+  with no regional variant, and neither this integration nor `asyncsleepiq`
+  reads a country, so a bed works wherever it is. Sleep Number's retail
+  footprint is a purchase constraint, not an operating one, and Sleep Country
+  Canada completed its acquisition of the business on 2026-07-31 with a
+  Canadian and UK rollout announced in principle, so a `["US"]` value would
+  have hidden the listing from those owners.
+- A second discovered bed, or the same bed on a new DHCP lease, no longer
+  raises a second card. `async_step_dhcp` defers to `ConfigFlow`'s
+  `_async_handle_discovery_without_unique_id`, which adds an
+  `already_in_progress` abort to the `already_configured` one. Core's
+  `sleepiq` claims the same `64DBA0*` prefix and Home Assistant appends a
+  custom integration's matchers to core's list, so a user who has not set core
+  up still sees core's card beside this one; that card is core's and is not
+  this integration's to suppress.
+- `requires-python` is `>=3.14` and ruff targets `py314`. homeassistant
+  2026.8.3 declares `Requires-Python >=3.14.2`, the Tests job installs 3.14 and
+  the mypy block pins `python_version` 3.14. The formatter writes 3.14's
+  parenthesis-free `except` clauses under that target.
 
 ### Added
 
@@ -70,6 +84,22 @@ Newest first, in the style of
   The address space is pinned in `tools/_netblocks.py`, which is the one
   published file the scan skips and which may hold nothing but those three
   names. 51 files are read on this tree; a scan that reads none fails.
+- The name half of both scans is live. `internal_names()` reads
+  `HA_DEV_HOST_NAMES`, which holds the names comma or whitespace separated or
+  the path of a file listing them, and both scans refuse each name with any
+  trailing word characters. The names are never written into the tree, because
+  that is the disclosure the scans exist to prevent. The report says how many
+  names were supplied, so a scan given none cannot read as a scan that found
+  none, and `scan_controls` fires both matchers on synthetic input so a clean
+  result is never a broken matcher. Measured on a clone of this tree: the
+  variable unset and a development name in `README.md`, exit 0 with the note
+  reading zero names; the variable set with the same file, exit 1 naming
+  `README.md` and the line; the matcher replaced with one that matches
+  nothing, exit 1 on the control.
+- `const.VERSION` joins `manifest.json` and `pyproject.toml` as a third
+  version field, and the validator refuses a mismatch between any of them.
+- `.html` joins `PUBLISHED_SUFFIXES`, so an HTML file added to the tree is
+  scanned rather than skipped. No such file ships today.
 - The mypy block is Home Assistant core's generated `mypy.ini` `[mypy]` section
   at 2026.8.3 plus `strict`. The `tests.*` override dropped `strict = false`,
   which mypy 1.18.2 accepts in a per-module section and then uses to discard
@@ -79,9 +109,9 @@ Newest first, in the style of
 - `tools/validate_local.py` also runs those matchers over every blob and commit
   message in `git cat-file --batch-all-objects`. The tree scan reads the index,
   so an object no ref reaches passes it, and a forge serves an unreachable
-  commit by its SHA. Measured on this clone: exit 1 naming three orphaned
-  blobs; on a fresh clone, which carries only reachable objects, 271 objects
-  scanned and exit 0. A version of `tools/_netblocks.py` is skipped by its name
+  commit by its SHA. Measured 2026-09-16 on this clone: exit 1 naming three
+  orphaned blobs. On a `--depth 1` clone, which carries only reachable objects,
+  51 objects are scanned. A version of `tools/_netblocks.py` is skipped by its name
   in the tree; two commit messages that state the pinned CIDRs are skipped by
   SHA in `SCAN_EXEMPT_OBJECTS`.
 
