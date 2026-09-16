@@ -6,10 +6,10 @@ consistency that nothing else checks: the vendored core files against their
 recorded upstream hashes, translation keys against icons and names, exceptions
 raised against exceptions declared, user-facing exceptions raised without a
 translation key, the manifest's published URLs against private address space,
-the version fields against each other, the quality scale
-against the pinned rule list, and every rule marked `done` against the file
-set that would have to exist for it to be true. Run it before a push so the
-push is not the first verification.
+the brand images against their required pixel sizes, the version fields
+against each other, the quality scale against the pinned rule list, and every
+rule marked `done` against the file set that would have to exist for it to be
+true. Run it before a push so the push is not the first verification.
 
     python tools/validate_local.py
 """
@@ -55,6 +55,15 @@ VALID_IOT_CLASS = {
 # outside the house, so the address family is checked, not the spelling.
 MANIFEST_URL_KEYS = ("documentation", "issue_tracker")
 PRIVATE_HOST_SUFFIXES = (".local", ".lan", ".internal")
+
+# Home Assistant serves these from custom_components/<domain>/brand/ at
+# /api/brands/integration/<domain>/<file>.
+BRAND_SIZES = {
+    "icon.png": (256, 256),
+    "icon@2x.png": (512, 512),
+    "logo.png": (512, 256),
+    "logo@2x.png": (1024, 512),
+}
 
 # Pinned from developers.home-assistant.io/docs/core/integration-quality-scale/checklist
 # (checked 2026-09-02: 54 rules, none new or deprecated). The list is pinned
@@ -248,6 +257,34 @@ def baseline() -> tuple[dict[str, str], set[str]]:
     return hashes, modified
 
 
+def brand_faults() -> list[str]:
+    """Brand files that are absent or the wrong size, one string each.
+
+    HACS requires the brand directory of a custom integration; the store shows
+    a grey box when a file is missing, with no error anywhere. The pixel sizes
+    are checked here rather than trusted from tools/make_brand.py, which is
+    what wrote them.
+    """
+    faults = []
+    for name, want in BRAND_SIZES.items():
+        path = os.path.join(COMP, "brand", name)
+        if not os.path.isfile(path):
+            faults.append(f"brand/{name} is missing")
+            continue
+        try:
+            from PIL import Image
+        except ImportError:
+            notes.append("Pillow not installed - brand image sizes not measured")
+            return faults
+        with Image.open(path) as image:
+            size = image.size
+        if size != want:
+            faults.append(
+                f"brand/{name} is {size[0]}x{size[1]}, want {want[0]}x{want[1]}"
+            )
+    return faults
+
+
 def missing_evidence(manifest: dict[str, Any]) -> dict[str, str]:
     """Rules whose mechanism is not in the files, with what is missing.
 
@@ -270,6 +307,11 @@ def missing_evidence(manifest: dict[str, Any]) -> dict[str, str]:
         if not ok:
             missing[rule] = message
 
+    want(
+        "brands",
+        not brand_faults(),
+        "; ".join(brand_faults()),
+    )
     want(
         "discovery",
         not set(manifest) & {"dhcp", "zeroconf", "ssdp", "bluetooth", "usb"}
