@@ -86,16 +86,21 @@ Newest first, in the style of
   names. 51 files are read on this tree; a scan that reads none fails.
 - The name half of both scans is live. `internal_names()` reads
   `HA_DEV_HOST_NAMES`, which holds the names comma or whitespace separated or
-  the path of a file listing them, and both scans refuse each name with any
-  trailing word characters. The names are never written into the tree, because
-  that is the disclosure the scans exist to prevent. The report says how many
-  names were supplied, so a scan given none cannot read as a scan that found
-  none, and `scan_controls` fires both matchers on synthetic input so a clean
-  result is never a broken matcher. Measured on a clone of this tree: the
-  variable unset and a development name in `README.md`, exit 0 with the note
-  reading zero names; the variable set with the same file, exit 1 naming
-  `README.md` and the line; the matcher replaced with one that matches
-  nothing, exit 1 on the control.
+  the path of a file listing them, and falls back to `docs/local/dev-hosts.txt`
+  when the variable is unset. Both scans refuse each name with any trailing
+  word characters. The names are never written into the tree, because that is
+  the disclosure the scans exist to prevent. Neither source supplying a name is
+  a failure, not a note, so a run whose name half matched nothing cannot read
+  as a run that found nothing, and `scan_controls` fires both matchers on
+  synthetic input so a clean result is never a broken matcher. The Tests
+  workflow passes the names in from the `HA_DEV_HOST_NAMES` repository secret.
+  Measured on a clone of this tree: the variable unset and a development name
+  in `README.md`, exit 1 on the missing-names failure; the variable set with
+  the same file, exit 1 naming `README.md` and the line; the matcher replaced
+  with one that matches nothing, exit 1 on the control. Measured 2026-09-16 on
+  this clone: the variable unset and `docs/local/dev-hosts.txt` in place, the
+  note reads two names; the file moved aside, exit 1 on the missing-names
+  failure.
 - `const.VERSION` joins `manifest.json` and `pyproject.toml` as a third
   version field, and the validator refuses a mismatch between any of them.
 - `.html` joins `PUBLISHED_SUFFIXES`, so an HTML file added to the tree is
@@ -109,11 +114,35 @@ Newest first, in the style of
 - `tools/validate_local.py` also runs those matchers over every blob and commit
   message in `git cat-file --batch-all-objects`. The tree scan reads the index,
   so an object no ref reaches passes it, and a forge serves an unreachable
-  commit by its SHA. Measured 2026-09-16 on this clone: exit 1 naming three
-  orphaned blobs. On a `--depth 1` clone, which carries only reachable objects,
-  51 objects are scanned. A version of `tools/_netblocks.py` is skipped by its name
+  commit by its SHA. A version of `tools/_netblocks.py` is skipped by its name
   in the tree; two commit messages that state the pinned CIDRs are skipped by
   SHA in `SCAN_EXEMPT_OBJECTS`.
+- The object-database scan refuses a clone too shallow to scan. A clone carries
+  the commits a ref reaches, not every object the authoring clone holds, and
+  `actions/checkout` fetches depth 1 by default, which holds the tip commit
+  object alone. `refuse_truncated_history()` fails on
+  `git rev-parse --is-shallow-repository`, and again when the database holds
+  one commit object while the clone has two or more refs. The Tests workflow
+  checks out with `fetch-depth: 0`. Measured 2026-09-16 at HEAD, names
+  supplied: the authoring clone scans 347 objects and exits 1 on one reachable
+  commit message plus eight objects no ref reaches; a full clone of the same
+  HEAD scans 308 and exits 1 on that one reachable commit message; a
+  `--depth 1` clone scans 51 and exits 1 on both truncation failures. Before
+  the guard the same `--depth 1` clone printed "all offline checks passed" and
+  exited 0.
+- `.gitignore` holds build and editor artefacts only. The rules that keep the
+  local agent files and `docs/local/` out of the tree moved to
+  `.git/info/exclude`, which `git ls-files --exclude-standard` reads and which
+  no clone receives. Naming those paths in a published file advertised what it
+  was hiding. Measured 2026-09-16: `git ls-files --others --exclude-standard`
+  lists none of them after the move.
+- The `tests/ha` count in the README Windows shim table is 77, matching
+  `tests/winposix.py` and a collection of that directory. Measured 2026-09-16
+  with each shim removed in turn: `install_posix_modules()` returning early
+  aborts the session on `ModuleNotFoundError: No module named 'fcntl'` with 0
+  collected; `install_socketpair_escape()` returning early gives 77 errors;
+  `use_selector_event_loop()` replaced by a no-op gives 77 passed. The selector
+  loop stops nothing here and sits below the table rather than in it.
 
 ## [0.1.0] - 2026-09-05
 
