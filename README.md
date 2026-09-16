@@ -530,17 +530,24 @@ The GitHub Tests workflow is the check that counts: ruff, both suites over one
 coverage total gated at 95%, mypy in strict mode with Home Assistant installed,
 and the validator, on every push.
 
+## Licence
+
+The project is MIT, in `LICENSE`. The files in
+`custom_components/sleepiq_massage/` are derived from Home Assistant core and
+remain under Apache-2.0, whose text is in `LICENSE-APACHE` and whose file-by-file
+record is in `NOTICE`.
+
 ## Upstreaming
 
 The proper fix is upstream: add a massage object to `asyncsleepiq` (read and
 write, wired into `init_features()` / `update()`), then add the entities to
-`home-assistant/core`. This repo is deliberately Apache-2.0, matching Home
-Assistant, so the code here can move upstream without a licensing problem.
+`home-assistant/core`. The derived files are already Apache-2.0, which is core's
+own licence, so they move upstream unchanged.
 
 ## Credits
 
 `custom_components/sleepiq_massage/` is derived from the Home Assistant `sleepiq`
-integration by **@mfugate1** and **@kbickar**, Apache-2.0. See `NOTICE`.
+integration by @mfugate1 and @kbickar. See `NOTICE`.
 
 The underlying API behaviour was confirmed by capturing the SleepIQ Android
 app's own traffic; the endpoint documentation lives in a separate repository.
