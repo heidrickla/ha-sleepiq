@@ -5,9 +5,12 @@ The project licence is MIT; LICENSE carries the text.
 
 This product includes software developed by the Home Assistant project
 (https://github.com/home-assistant/core), licensed under the Apache License,
-Version 2.0. LICENSE-APACHE carries that text. The files listed below as
-derived from core remain under Apache-2.0 and keep its obligations, including
-this notice.
+Version 2.0. docs/licenses/Apache-2.0.txt carries that text; it is not at the
+repository root because GitHub's licence detection reports NOASSERTION when two
+licence-named files sit there, which fails the HACS licence check. The files
+listed below as derived from core remain under Apache-2.0 and keep its
+obligations, including this notice. Every other file, including the four added
+files listed below, is MIT.
 
 The contents of custom_components/sleepiq_massage/ are derived from
 homeassistant/components/sleepiq/ at tag 2026.8.2. The per-file SHA-256 hashes
