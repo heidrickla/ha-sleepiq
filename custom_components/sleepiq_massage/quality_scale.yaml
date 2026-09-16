@@ -200,12 +200,22 @@ rules:
       The manifest matches the bed's DHCP MAC prefix and the flow has an
       async_step_dhcp. The bed announces nothing about which SleepIQ account
       owns it and the integration talks to the cloud, so the step offers the
-      sign-in form; when an entry already exists it aborts, because one entry
-      covers every bed on the account. Both outcomes are tested. Core's sleepiq
-      declares the same 64DBA0* prefix and loader.async_get_dhcp appends custom
-      matchers to core's list rather than replacing by domain, so one bed raises
-      a card for each domain; dropping this matcher would leave the user with
-      core's card alone. README documents the second card.
+      sign-in form. It defers to ConfigFlow's
+      _async_handle_discovery_without_unique_id, which aborts
+      already_configured when an entry exists, one entry covering every bed on
+      the account, and already_in_progress when a card is already waiting, so a
+      second bed or a new DHCP lease raises no second card. All three outcomes
+      are tested. Core's sleepiq declares the same 64DBA0* prefix at
+      homeassistant/generated/dhcp.py:991, and loader.async_get_dhcp copies
+      core's list and appends custom matchers rather than replacing by domain,
+      so one bed matches both domains and components/dhcp/__init__.py:285
+      starts a flow for each. Core's flow has no async_step_dhcp of its own and
+      aborts on core's own entry at config_entries.py:3305, so a user who has
+      core set up sees one card, this one; a user who does not sees two,
+      SleepIQ and SleepIQ (with massage). Aborting this flow on a core entry
+      was measured and rejected: that is the state with no duplicate, and the
+      abort would hide this integration from the user most likely to be
+      switching to it. Dropping this matcher would leave core's card alone.
   discovery-update-info:
     status: exempt
     comment: |

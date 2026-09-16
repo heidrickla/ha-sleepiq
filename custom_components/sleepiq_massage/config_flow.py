@@ -60,16 +60,23 @@ class SleepIQFlowHandler(ConfigFlow, domain=DOMAIN):
         The bed announces itself by MAC prefix but says nothing about which
         SleepIQ account owns it, and the integration talks to the cloud rather
         than to the bed, so discovery can only offer the sign-in form. One
-        entry already covers every bed on an account, so a second bed on a
-        configured account has nothing to add.
+        entry already covers every bed on an account, and one card covers every
+        bed on the network, so the base class guard supplies both aborts:
+        already_configured against an existing entry, already_in_progress
+        against a second bed or a new DHCP lease.
+
+        Core's sleepiq declares the same 64DBA0* prefix and
+        loader.async_get_dhcp appends custom matchers to core's list, so one
+        bed starts a flow for each domain. Core's card disappears only when
+        core has its own entry; this flow cannot see core's entries, because
+        _async_current_entries is scoped to this handler.
         """
         _LOGGER.debug(
             "SleepNumber bed discovered at %s (%s)",
             discovery_info.ip,
             discovery_info.macaddress,
         )
-        if self._async_current_entries():
-            return self.async_abort(reason="already_configured")
+        await self._async_handle_discovery_without_unique_id()
         self.context["title_placeholders"] = {"name": "SleepNumber bed"}
         return await self.async_step_user()
 

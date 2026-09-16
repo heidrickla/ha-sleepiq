@@ -2,6 +2,7 @@
   "config": {
     "abort": {
       "already_configured": "Account is already configured",
+      "already_in_progress": "A discovered bed is already waiting to be set up",
       "cannot_connect": "Failed to connect to SleepIQ. The account in configuration.yaml was not imported.",
       "invalid_auth": "Invalid authentication. The account in configuration.yaml was not imported.",
       "reauth_successful": "Re-authentication was successful",

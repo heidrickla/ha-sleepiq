@@ -18,6 +18,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.selector import TextSelector
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
+from homeassistant.loader import async_get_dhcp
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.sleepiq_massage.const import DOMAIN
@@ -148,6 +149,65 @@ async def test_a_discovered_bed_on_a_configured_account_aborts(
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
+
+
+async def test_one_bed_matches_core_and_this_integration(hass: HomeAssistant) -> None:
+    """loader.async_get_dhcp appends, so 64DBA0* carries two domains."""
+    matchers = [
+        matcher
+        for matcher in await async_get_dhcp(hass)
+        if matcher.get("macaddress") == "64DBA0*"
+    ]
+
+    assert sorted(matcher["domain"] for matcher in matchers) == [
+        "sleepiq",
+        "sleepiq_massage",
+    ]
+
+
+async def test_a_core_entry_does_not_hide_this_card(hass: HomeAssistant) -> None:
+    """Core's own entry removes core's card, not this one, leaving one card."""
+    MockConfigEntry(
+        domain="sleepiq",
+        data=SLEEPIQ_CONFIG,
+        unique_id=SLEEPIQ_CONFIG[CONF_USERNAME].lower(),
+    ).add_to_hass(hass)
+
+    ours = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_DHCP},
+        data=DHCP_DISCOVERY,
+    )
+    theirs = await hass.config_entries.flow.async_init(
+        "sleepiq",
+        context={"source": config_entries.SOURCE_DHCP},
+        data=DHCP_DISCOVERY,
+    )
+
+    assert ours["type"] is FlowResultType.FORM
+    assert theirs["type"] is FlowResultType.ABORT
+    assert theirs["reason"] == "already_configured"
+
+
+async def test_a_second_bed_does_not_raise_a_second_card(hass: HomeAssistant) -> None:
+    """Two beds, or one bed on a new lease, leave one card waiting."""
+    first = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_DHCP},
+        data=DHCP_DISCOVERY,
+    )
+    second = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_DHCP},
+        data=DhcpServiceInfo(
+            ip="10.0.0.6", hostname="sleepnumber", macaddress="64dba0ddeeff"
+        ),
+    )
+
+    assert first["type"] is FlowResultType.FORM
+    assert second["type"] is FlowResultType.ABORT
+    assert second["reason"] == "already_in_progress"
+    assert len(hass.config_entries.flow.async_progress_by_handler(DOMAIN)) == 1
 
 
 # --------------------------------------------------------------------- user
