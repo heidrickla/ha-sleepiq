@@ -1,9 +1,9 @@
 # The Integration Quality Scale, rule by rule, for a repository that vendors
-# core's sleepiq and adds massage control. Wave 1 recorded which rules core's
-# own sleepiq fails; wave 2 forked those files rather than inherit the gaps, so
-# every entity here is this project's to answer for. Evidence is the GitHub
-# Tests workflow, which runs on every push: ruff, both test suites with
-# coverage gated at 95%, mypy in strict mode with Home Assistant installed, and
+# core's sleepiq under the domain sleepiq_massage and adds massage control.
+# Every file is forked, so every entity here is this project's to answer for
+# rather than core's. Evidence is the GitHub Tests workflow, which runs on
+# every push: ruff, both test suites with coverage gated at 95%, mypy in
+# strict mode with Home Assistant installed, and
 # tools/validate_local.py, which fails a rule filed `done` whose mechanism is
 # not in the files. The badge itself is core-only and manifest.json claims no
 # tier.
@@ -178,12 +178,14 @@ rules:
   diagnostics:
     status: done
     comment: |
-      diagnostics.py dumps the entry, coordinator health, each bed's sleepers,
+      diagnostics.py reports coordinator health and each bed's sleepers,
       foundation features and massage state, redacting the account, the bed's
-      MAC and the sleepers' names. The massage mode select also keeps the raw
-      massage block as attributes, on purpose: the open Full Body pattern
-      investigation needs to watch it live while the vendor app drives the
-      bed, which a downloaded snapshot cannot do.
+      name, the bed's MAC and the sleepers' names. The entry section names the
+      two keys it reports rather than dumping entry.data, because the
+      deprecated YAML import passes its block into the entry. The massage mode
+      select also keeps the raw massage block as attributes, on purpose: the
+      open Full Body pattern investigation needs to watch it live while the
+      vendor app drives the bed, which a downloaded snapshot cannot do.
   discovery:
     status: done
     comment: |
