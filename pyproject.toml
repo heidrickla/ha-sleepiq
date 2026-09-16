@@ -2,7 +2,10 @@
 name = "ha-sleepiq"
 version = "0.2.0"
 description = "Home Assistant's SleepIQ integration with massage control added."
-requires-python = ">=3.13"
+# homeassistant 2026.8.3 declares Requires-Python >=3.14.2. The Tests job
+# installs 3.14, the mypy block pins python_version 3.14 and ruff targets
+# py314, whose parenthesis-free except clauses this tree uses.
+requires-python = ">=3.14"
 
 # Ruff is configured in ruff.toml, which explains why the vendored core files
 # keep core's import order. Ruff reads that file in preference to this one.

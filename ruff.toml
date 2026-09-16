@@ -13,7 +13,10 @@
 # So: adopt core's isort settings rather than fight them.
 # Mirrors home-assistant/core pyproject.toml [tool.ruff.lint.isort].
 
-target-version = "py313"
+# The Tests job installs Python 3.14 and the mypy block pins python_version
+# 3.14, so ruff targets the same interpreter.
+target-version = "py314"
+line-length = 88
 
 [lint.isort]
 force-sort-within-sections = true
