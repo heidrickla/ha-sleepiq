@@ -26,14 +26,14 @@ the day the work landed.
   entities on the next poll, and a bed that has left the account loses its
   device and everything under it. A bed list that comes back empty is treated
   as a cloud hiccup and changes nothing.
-- **A repair notice** when the deprecated `sleepiq:` YAML block is imported,
+- **A repair notice** when the deprecated `sleepiq_massage:` YAML block is imported,
   naming the one action that clears it.
 - **Diagnostics download**: beds, sleepers, foundation features, coordinator
   health and the raw massage block, with the account, the bed's MAC address and
   the sleepers' first names redacted.
 - **Runtime translations.** `translations/en.json` now ships, so labels are
   words rather than raw keys such as
-  `component.sleepiq.entity.select.massage_mode.state.soothe`.
+  `component.sleepiq_massage.entity.select.massage_mode.state.soothe`.
 - **Field descriptions** under the username and password on every form, and a
   masked password field that never echoes what was typed.
 
@@ -85,7 +85,7 @@ the day the work landed.
 - README: every entity and its default state, the installation fields,
   discovery, configuration options, the update cadence, use cases, examples,
   troubleshooting, and how to remove the integration.
-- `custom_components/sleepiq/quality_scale.yaml`: the Integration Quality Scale
+- `custom_components/sleepiq_massage/quality_scale.yaml`: the Integration Quality Scale
   rule by rule, with the evidence for each. All 54 rules are `done` or
   `exempt`.
 - `NOTICE` and `docs/UPSTREAM-BASELINE.txt` describe every file changed from
@@ -96,7 +96,7 @@ the day the work landed.
 - A GitHub `Tests` workflow runs on every push: ruff, both test suites over one
   coverage total gated at 95%, mypy in strict mode with Home Assistant
   installed, and the offline validator. Coverage of
-  `custom_components/sleepiq` is 100%.
+  `custom_components/sleepiq_massage` is 100%.
 - `tools/validate_local.py` refuses a quality scale rule filed `done` whose
   mechanism is not in the files.
 - The Home Assistant test suite runs on a Windows workstation as well as on the

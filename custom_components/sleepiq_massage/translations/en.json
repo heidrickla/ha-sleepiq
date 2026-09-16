@@ -219,7 +219,7 @@
   },
   "issues": {
     "deprecated_yaml": {
-      "description": "The SleepIQ account in your configuration.yaml has been imported into a config entry and the YAML block now does nothing. Remove the `sleepiq:` block from configuration.yaml and restart Home Assistant.",
+      "description": "The SleepIQ account in your configuration.yaml has been imported into a config entry and the YAML block now does nothing. Remove the `sleepiq_massage:` block from configuration.yaml and restart Home Assistant.",
       "title": "The SleepIQ YAML configuration is no longer used"
     }
   }

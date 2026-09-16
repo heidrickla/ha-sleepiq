@@ -16,7 +16,7 @@ pytest.importorskip("asyncsleepiq", reason="asyncsleepiq is not installed")
 
 from asyncsleepiq.consts import Mode, Side, Speed
 
-from custom_components.sleepiq.massage import (
+from custom_components.sleepiq_massage.massage import (
     MASSAGE_DEFAULT_TIMER,
     SleepIQMassage,
     build_massage_sides,

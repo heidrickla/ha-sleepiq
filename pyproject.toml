@@ -40,7 +40,7 @@ follow_imports = "silent"
 
 [[tool.mypy.overrides]]
 # The tests are not the integration. The Tests job runs mypy over
-# custom_components/sleepiq, where this block has no effect at all.
+# custom_components/sleepiq_massage, where this block has no effect at all.
 module = "tests.*"
 strict = false
 disallow_untyped_defs = false

@@ -25,7 +25,9 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 import pytest
 
-from custom_components.sleepiq.diagnostics import async_get_config_entry_diagnostics
+from custom_components.sleepiq_massage.diagnostics import (
+    async_get_config_entry_diagnostics,
+)
 
 from .conftest import (
     ADJUSTMENT_URL,

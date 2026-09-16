@@ -32,7 +32,7 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
-from custom_components.sleepiq.const import (
+from custom_components.sleepiq_massage.const import (
     CORE_CLIMATE,
     DOMAIN,
     FOOT_WARMER,
@@ -44,7 +44,7 @@ from custom_components.sleepiq.const import (
     PRESSURE,
     SLEEP_NUMBER,
 )
-from custom_components.sleepiq.coordinator import UPDATE_INTERVAL
+from custom_components.sleepiq_massage.coordinator import UPDATE_INTERVAL
 
 from .conftest import (
     BED_2_ID,
@@ -310,7 +310,7 @@ async def test_the_yaml_block_raises_a_repair_issue(
     """The account is imported once; the YAML that is left over says so."""
     with (
         patch("asyncsleepiq.AsyncSleepIQ.login"),
-        patch("custom_components.sleepiq.PLATFORMS", []),
+        patch("custom_components.sleepiq_massage.PLATFORMS", []),
     ):
         assert await async_setup_component(hass, DOMAIN, {DOMAIN: SLEEPIQ_CONFIG})
         await hass.async_block_till_done()
@@ -361,7 +361,7 @@ async def test_unique_id_migration(
         config_entry=entry,
     )
 
-    with patch("custom_components.sleepiq.PLATFORMS", []):
+    with patch("custom_components.sleepiq_massage.PLATFORMS", []):
         assert await async_setup_component(hass, DOMAIN, {})
     await hass.async_block_till_done()
 
@@ -411,7 +411,7 @@ async def test_massage_unique_ids_move_from_the_sleeper_to_the_side(
         config_entry=entry,
     )
 
-    with patch("custom_components.sleepiq.PLATFORMS", ["select", "number"]):
+    with patch("custom_components.sleepiq_massage.PLATFORMS", ["select", "number"]):
         assert await async_setup_component(hass, DOMAIN, {})
     await hass.async_block_till_done()
 
@@ -469,7 +469,7 @@ async def test_comfort_select_unique_ids_move_from_the_sleeper_to_the_side(
         config_entry=entry,
     )
 
-    with patch("custom_components.sleepiq.PLATFORMS", ["select", "number"]):
+    with patch("custom_components.sleepiq_massage.PLATFORMS", ["select", "number"]):
         assert await async_setup_component(hass, DOMAIN, {})
     await hass.async_block_till_done()
 

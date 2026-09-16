@@ -38,9 +38,9 @@ jobs:
       # a module so pyproject's `-p tests.winposix` resolves; that plugin only
       # does anything on Windows.
       - run: .venv/bin/python -m pytest tests/test_massage.py -p no:homeassistant
-          --cov=custom_components/sleepiq --cov-report=
+          --cov=custom_components/sleepiq_massage --cov-report=
       - run: .venv/bin/python -m pytest tests/ha
-          --cov=custom_components/sleepiq --cov-append
+          --cov=custom_components/sleepiq_massage --cov-append
           --cov-report=term-missing --cov-fail-under=95
-      - run: .venv/bin/python -m mypy custom_components/sleepiq
+      - run: .venv/bin/python -m mypy custom_components/sleepiq_massage
       - run: .venv/bin/python tools/validate_local.py

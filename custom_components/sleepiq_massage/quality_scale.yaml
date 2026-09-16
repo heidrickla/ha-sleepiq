@@ -162,7 +162,7 @@ rules:
     comment: |
       The GitHub Tests workflow runs the pure massage suite and the Home
       Assistant layer suite over one coverage total and fails under 95%. It
-      stands at 100% of custom_components/sleepiq, with every platform, both
+      stands at 100% of custom_components/sleepiq_massage, with every platform, both
       migrations, the discovery and reconfigure flows, the repair issue, and
       the added and removed bed paths exercised.
 
@@ -266,7 +266,7 @@ rules:
     status: done
     comment: |
       Importing the deprecated YAML block raises a repair issue that names the
-      one action that clears it: delete the sleepiq block from
+      one action that clears it: delete the sleepiq_massage block from
       configuration.yaml. Nothing else needs the user's hand; authentication
       failures go to reauth, which is a flow rather than an issue.
   stale-devices:

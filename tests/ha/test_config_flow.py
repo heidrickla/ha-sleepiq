@@ -18,7 +18,7 @@ from homeassistant.helpers.selector import TextSelector
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.sleepiq.const import DOMAIN
+from custom_components.sleepiq_massage.const import DOMAIN
 
 from .conftest import SLEEPIQ_CONFIG, setup_platform
 
@@ -319,7 +319,7 @@ async def test_reauth_password(hass: HomeAssistant) -> None:
     _password_is_masked_and_not_echoed(result)
 
     with patch(
-        "custom_components.sleepiq.config_flow.AsyncSleepIQ.login",
+        "custom_components.sleepiq_massage.config_flow.AsyncSleepIQ.login",
         return_value=True,
     ):
         result2 = await hass.config_entries.flow.async_configure(

@@ -59,7 +59,7 @@ jobs:
           notice = io.open("NOTICE", encoding="utf-8").read()
           bad = []
           for name, want in sorted(base.items()):
-              p = os.path.join("custom_components/sleepiq", name)
+              p = os.path.join("custom_components/sleepiq_massage", name)
               if not os.path.exists(p):
                   bad.append(f"{name}: MISSING"); continue
               got = hashlib.sha256(open(p, "rb").read()).hexdigest()
@@ -87,7 +87,7 @@ jobs:
 
       - name: JSON is valid
         run: |
-          for f in custom_components/sleepiq/*.json custom_components/sleepiq/translations/*.json hacs.json; do
+          for f in custom_components/sleepiq_massage/*.json custom_components/sleepiq_massage/translations/*.json hacs.json; do
             python3 -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "$f" || exit 1
           done
           echo "all JSON valid"
@@ -96,10 +96,10 @@ jobs:
         run: |
           python3 - <<'PY'
           import json
-          m = json.load(open("custom_components/sleepiq/manifest.json", encoding="utf-8"))
+          m = json.load(open("custom_components/sleepiq_massage/manifest.json", encoding="utf-8"))
           missing = [k for k in ("domain","name","version","documentation","codeowners") if not m.get(k)]
           assert not missing, f"manifest missing: {missing}"
-          assert m["domain"] == "sleepiq", m["domain"]
+          assert m["domain"] == "sleepiq_massage", m["domain"]
           # A custom integration without a version silently fails to load - the
           # symptom is a missing integration, not an error.
           assert m["version"], "version is required for a custom integration"
@@ -114,11 +114,11 @@ jobs:
         run: |
           python3 - <<'PY'
           import json
-          s = json.load(open("custom_components/sleepiq/strings.json", encoding="utf-8"))
-          e = json.load(open("custom_components/sleepiq/translations/en.json", encoding="utf-8"))
+          s = json.load(open("custom_components/sleepiq_massage/strings.json", encoding="utf-8"))
+          e = json.load(open("custom_components/sleepiq_massage/translations/en.json", encoding="utf-8"))
           assert s == e, "strings.json and translations/en.json differ - copy strings.json over"
           for name in ("strings.json", "translations/en.json"):
-              assert "%key:" not in open(f"custom_components/sleepiq/{name}", encoding="utf-8").read(), f"{name}: core-only [%key:...] reference"
+              assert "%key:" not in open(f"custom_components/sleepiq_massage/{name}", encoding="utf-8").read(), f"{name}: core-only [%key:...] reference"
           print("translations ok")
           PY
 
@@ -128,7 +128,7 @@ jobs:
           python3 - <<'PY'
           import json, yaml
           rules = yaml.safe_load(open(
-              "custom_components/sleepiq/quality_scale.yaml", encoding="utf-8"))["rules"]
+              "custom_components/sleepiq_massage/quality_scale.yaml", encoding="utf-8"))["rules"]
           todo = sorted(k for k, v in rules.items()
                         if isinstance(v, dict) and v.get("status") == "todo")
           for name, v in rules.items():
@@ -139,7 +139,7 @@ jobs:
               else:
                   assert v == "done", name
           claimed = json.load(open(
-              "custom_components/sleepiq/manifest.json", encoding="utf-8")
+              "custom_components/sleepiq_massage/manifest.json", encoding="utf-8")
           ).get("quality_scale")
           assert not (claimed and todo), f"manifest claims {claimed} with todo: {todo}"
           print(f"{len(rules)} rules; still todo: {', '.join(todo) or 'none'}")
@@ -157,6 +157,8 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # This shadows core's sleepiq, whose brand assets live in the core
-          # half of home-assistant/brands. HACS only checks the custom half.
+          # Brand art ships in custom_components/sleepiq_massage/brand/, which
+          # Home Assistant serves at /api/brands/integration/<domain>/<file>.
+          # The action's brands check reads home-assistant/brands, where this
+          # project does not register.
           ignore: brands

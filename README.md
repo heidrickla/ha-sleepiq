@@ -120,7 +120,7 @@ entity.
 **HACS** - add this repository as a custom repository (category: Integration),
 install, restart Home Assistant.
 
-**Manual** - copy `custom_components/sleepiq/` into your config directory's
+**Manual** - copy `custom_components/sleepiq_massage/` into your config directory's
 `custom_components/`, then restart.
 
 Either way Home Assistant will log that a custom integration is overriding a
@@ -393,8 +393,8 @@ timer arming correctly.
 **"You are using a custom integration sleepiq which has not been tested by Home
 Assistant"** in the log at startup - expected. It is the shadowing at work.
 
-**Labels show as raw keys** such as `component.sleepiq.entity.select.massage_mode.state.soothe`
-- the `translations/` folder did not make it into `custom_components/sleepiq/`.
+**Labels show as raw keys** such as `component.sleepiq_massage.entity.select.massage_mode.state.soothe`
+- the `translations/` folder did not make it into `custom_components/sleepiq_massage/`.
 Copy the whole folder from this repository and restart. Versions of this
 repository before September 2026 shipped without it; update.
 
@@ -428,7 +428,7 @@ response code.
 accepts (a firmness outside 5-100, a foot warming time outside 30-360). The
 message carries the library's own explanation.
 
-**A repair notice about the SleepIQ YAML configuration** - the `sleepiq:` block
+**A repair notice about the SleepIQ YAML configuration** - the `sleepiq_massage:` block
 in `configuration.yaml` was imported into a config entry when the integration
 first started and now does nothing. Delete the block and restart; the notice
 goes with it. Nothing else is affected: the account keeps working from the
@@ -459,7 +459,7 @@ can be watched live while the vendor app drives the bed.
    config entry, its devices and entities. Skip this if you want core's SleepIQ
    to keep the account; the entry is shared.
 2. Remove the component: in HACS, open SleepIQ (with massage) and choose
-   **Remove**; for a manual install delete `custom_components/sleepiq/`.
+   **Remove**; for a manual install delete `custom_components/sleepiq_massage/`.
 3. Restart Home Assistant.
 
 Core's integration takes over again. Every entity except three keeps its unique
@@ -539,7 +539,7 @@ Assistant, so the code here can move upstream without a licensing problem.
 
 ## Credits
 
-`custom_components/sleepiq/` is derived from the Home Assistant `sleepiq`
+`custom_components/sleepiq_massage/` is derived from the Home Assistant `sleepiq`
 integration by **@mfugate1** and **@kbickar**, Apache-2.0. See `NOTICE`.
 
 The underlying API behaviour was confirmed by capturing the SleepIQ Android
