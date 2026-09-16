@@ -51,6 +51,7 @@ class SleepIQFlowHandler(ConfigFlow, domain=DOMAIN):
             title=import_data[CONF_USERNAME], data=import_data
         )
 
+    @override
     async def async_step_dhcp(
         self, discovery_info: DhcpServiceInfo
     ) -> ConfigFlowResult:
