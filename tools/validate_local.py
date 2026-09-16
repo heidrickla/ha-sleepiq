@@ -419,6 +419,12 @@ REPO_ALLOWED_HOSTS = frozenset(
         "10.0.0.5",  # a bed gateway address in tests/ha/test_config_flow.py
         "10.0.0.6",  # a second bed's address in tests/ha/test_config_flow.py
         "192.168.0.5",  # a bed gateway address in tests/ha/test_massage_entities.py
+        # The object scan reads commit messages, and a message that records
+        # which ranges this rule refuses names them. These three are the ones
+        # it quotes. Each names a range or a vendor default, never a machine.
+        "100.64.0.0",  # the CGNAT network address, quoted in the rule's own history
+        "192.168.1.254",  # the AT&T gateway factory default, public product documentation
+        "10.0.0.3",  # a synthetic address a commit message uses as its example
     }
 )
 
