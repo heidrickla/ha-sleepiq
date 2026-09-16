@@ -166,6 +166,12 @@ Then add it from Settings > Devices & services > Add integration > SleepIQ
 
 Minimum Home Assistant version: 2026.8.0.
 
+`hacs.json` sets no `country`. That key filters the store listing to the
+countries it names, hiding the repository from everyone else. The SleepIQ cloud
+is one global endpoint with no regional variant, and neither this integration
+nor `asyncsleepiq` reads a country, so a bed works wherever it is. Sleep
+Number's retail footprint is a purchase constraint, not an operating one.
+
 ### Installation parameters
 
 | Field | Required | What to enter |
