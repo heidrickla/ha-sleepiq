@@ -35,10 +35,29 @@ and create their own devices and entities.
 | Core `sleepiq` is already set up | Nothing. Its config entry, entities and history stay under domain `sleepiq`. |
 | Both are set up | Two sets of entities for the same bed. The second set's entity ids get a `_2` suffix, because the names collide. |
 | You want one set | Delete core's config entry: Settings > Devices & services > SleepIQ > three dots > Delete. Its entities and their history go with it. |
-| Upgrading from 0.1.0 of this repo | 0.1.0 used domain `sleepiq`. On the restart after the update, core's built-in `sleepiq` takes that config entry over and the massage entities disappear. Add SleepIQ (with massage) from Add integration, then delete the old entry if you want one set. |
+| Upgrading from 0.1.0 of this repo | The 0.1.0 directory is left on disk and keeps shadowing core's `sleepiq`. Delete it, as below. |
 
 Unique ids are registered against this integration's own platform, so they
 never collide with core's even where the id string is the same.
+
+### Upgrading from 0.1.0
+
+0.1.0 used domain `sleepiq`, so it lived in `config/custom_components/sleepiq`.
+HACS installs 0.2.0 into `config/custom_components/sleepiq_massage` and leaves
+the 0.1.0 directory where it is: `remove_local_directory()` is called only from
+`uninstall()`, never on an update, and the install path is derived from the
+manifest domain of the version being downloaded. Home Assistant loads
+`custom_components/sleepiq` in preference to the built-in `sleepiq`, so the
+0.1.0 copy keeps serving that config entry and HACS no longer tracks it to
+update it.
+
+Do this after the update:
+
+1. Delete `config/custom_components/sleepiq`.
+2. Restart Home Assistant. Core's built-in `sleepiq` takes over the 0.1.0
+   config entry and the massage entities disappear with the 0.1.0 code.
+3. Add SleepIQ (with massage) from Add integration.
+4. Delete the old entry if you want one set of entities.
 
 ## Supported devices
 
@@ -97,7 +116,7 @@ Per bed, from core:
 | `{bed} {Left/Right} foundation preset` | `select` | Favorite, Read, Watch TV, Flat, Zero G, Snore |
 | `{bed} Light {n}` | `light` | Under-bed light or night stand outlet |
 | `{bed} Pause mode` | `switch` | Privacy mode: stops the bed reporting sleep data |
-| `{bed} Calibrate` | `button` | Re-baseline the pressure sensors. Filed under **Configuration** on the device page, because it sets the bed up rather than operating it |
+| `{bed} Calibrate` | `button` | Re-baseline the pressure sensors. Filed under Configuration on the device page, because it sets the bed up rather than operating it |
 | `{bed} Stop pump` | `button` | Stop a firmness adjustment in progress |
 
 A foundation that reports no side names its positions and its preset without
@@ -264,17 +283,17 @@ screen says the same: "Adjust either foot and head or full body massage". So:
 - Selecting a mode other than off drives both speed entities to off.
 - Selecting a non-off speed drives the mode entity to off.
 
-The entities mirror that deliberately. If they did not, the UI would show a
-state the bed is not in.
+If they did not, the UI would show a state the bed is not in.
 
-### Starting a massage arms a 60 minute timer
+### A speed write with no timer set sends 60 minutes
 
-Selecting any speed or mode with no timer set arms 60 minutes, the maximum the
-vendor app and the physical remotes offer.
+Selecting a speed with no timer set sends `massageTimer: 60`, the maximum the
+vendor app and the physical remotes offer. It covers the expiry behaviour
+below: the bed drops an idle timer, so a speed started without one has nothing
+scheduled to stop it.
 
-It exists because of the expiry behaviour below: the bed drops an idle timer,
-so a massage started without one has nothing scheduled to stop it. Defaulting
-means the motors always have an end.
+A mode write sends `waveMode` on its own and no timer. Nothing schedules the
+end of a pattern from Home Assistant; see the full-body limitation below.
 
 An explicitly set timer is never overridden. The logic is
 `self.timer or MASSAGE_DEFAULT_TIMER`, matching how core defaults comparable
@@ -311,8 +330,6 @@ rather than a stored preference. Measured on hardware:
 | set right = 12 | 0.0 | **12.0** |
 | right speed -> low | 0.0 | **12.0** |
 
-Two things follow.
-
 The timers are per-side and independent. Setting one never moves the other, so
 the value on one side tells you nothing about the other. There is no shared
 bed-wide timer to read.
@@ -348,8 +365,7 @@ rejected. The bed's owner watched the mattress and reported that the side did
 turn on for a while during a test that Home Assistant had recorded as a total
 failure. The pattern starts, runs briefly, and stops, and because `waveMode`
 reads back `0` once it has stopped, the API view alone made it look like
-nothing had happened. The API state was consistent with "request rejected" and
-was wrong. Only watching the hardware distinguished the two.
+nothing had happened.
 
 Three request shapes have been tried, all on an idle side:
 
@@ -359,10 +375,8 @@ Three request shapes have been tried, all on an idle side:
 | `waveMode` + `massageTimer` | starts, stops |
 | `waveMode` alone | starts, stops |
 
-A pattern set from the vendor phone app persists. The correct request therefore
-differs from all three above in some way that has not been guessed. Three
-attempts, three failures: the remaining move is to observe the real request
-rather than infer it.
+A pattern set from the vendor phone app persists, so the correct request
+differs from all three above.
 
 One hypothesis, from the app's own UI: the massage screen gives Full Body its
 own Start Timer, separate from the Foot/Head one. A pattern may need that timer
@@ -372,8 +386,6 @@ a brief burst and stops.
 Writes use the app's partial-payload dialect rather than the library's
 all-five-fields call: `{"footMassageMotor": N, "headMassageMotor": N,
 "massageTimer": N, "side": "R"}`, matching what the app was observed sending.
-Speed control was regression-tested after the change and still works, with the
-timer arming correctly.
 
 ### Other limitations
 
@@ -423,7 +435,6 @@ history.
 
 ## Keeping in sync with core
 
-This is a copy of a core integration, which is the real cost of the approach.
 When Home Assistant updates `sleepiq`, this copy does not follow.
 
 `docs/UPSTREAM-BASELINE.txt` records the SHA-256 of each file as copied from
