@@ -48,10 +48,11 @@ jobs:
           --cov=custom_components/sleepiq_massage --cov-append
           --cov-report=term-missing --cov-fail-under=95
       - run: .venv/bin/python -m mypy custom_components/sleepiq_massage
-      # The name half of both scans matches nothing without names, and the
-      # names cannot live in the tree. The secret carries them in; the
-      # validator fails when neither it nor docs/local/dev-hosts.txt supplies
-      # one, so a run missing the secret is loud rather than green.
+      # No HA_DEV_HOST_NAMES here, from a secret or otherwise. An undefined
+      # secret expands to the empty string, which is the same as omitting the
+      # variable while reading as coverage. A defined one would put the name
+      # into a public run log the first time the name half matched, which is
+      # the disclosure the scan exists to prevent. This run covers the address
+      # literals, the URL hosts and the bare private host names; the name half
+      # runs locally, where the names already are.
       - run: .venv/bin/python tools/validate_local.py
-        env:
-          HA_DEV_HOST_NAMES: ${{ secrets.HA_DEV_HOST_NAMES }}
