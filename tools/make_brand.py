@@ -142,7 +142,9 @@ def main() -> None:
         transparent = all(a == 0 for a in corners)
         left, top, right, bottom = alpha.getbbox() or (0, 0, 0, 0)
         box = min(w, h) * (1 - 2 * PAD_FRAC)
-        filled = (right - left) >= box * 0.88 and (bottom - top) >= box * MARK_H_FRAC - 2
+        filled = (right - left) >= box * 0.88 and (
+            bottom - top
+        ) >= box * MARK_H_FRAC - 2
         verdict = "OK" if good and transparent and filled else "FAILS THE RULE"
         print(
             f"  {name:14s} {w}x{h} {os.path.getsize(path)}B "

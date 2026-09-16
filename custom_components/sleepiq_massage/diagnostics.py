@@ -6,7 +6,7 @@ from typing import Any
 
 from asyncsleepiq.bed import SleepIQBed
 
-from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.components.diagnostics import REDACTED, async_redact_data
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 
@@ -33,7 +33,11 @@ def _bed(bed: SleepIQBed, massage_sides: list[SleepIQMassage]) -> dict[str, Any]
     foundation = bed.foundation
     return {
         "id": bed.id,
-        "name": bed.name,
+        # The bed's name in the SleepIQ app. Users name it after the room or
+        # the person who sleeps in it, so it is redacted here rather than in
+        # TO_REDACT, where the bare key `name` would also hit any feature or
+        # raw massage field that happens to be called that.
+        "name": REDACTED,
         "model": bed.model,
         "mac_addr": bed.mac_addr,
         "paused": bed.paused,
@@ -68,7 +72,13 @@ async def async_get_config_entry_diagnostics(
     data = entry.runtime_data
     return async_redact_data(
         {
-            "entry": dict(entry.data),
+            # Named keys, not dict(entry.data). The deprecated YAML import
+            # passes its block into the entry, so a dump would ship whatever
+            # a user put there under a key TO_REDACT does not list.
+            "entry": {
+                CONF_USERNAME: entry.data.get(CONF_USERNAME),
+                CONF_PASSWORD: entry.data.get(CONF_PASSWORD),
+            },
             "last_update_success": {
                 "status": data.data_coordinator.last_update_success,
                 "pause": data.pause_coordinator.last_update_success,
