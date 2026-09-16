@@ -478,8 +478,20 @@ against the baseline, translations against icons and code, every user-facing
 exception translated, the manifest's published URLs against private address
 space, the brand images against their required sizes, `PARALLEL_UPDATES` on
 every platform, no `_attr_name` or `_attr_icon` left anywhere, the quality
-scale complete, and every rule filed `done` against the mechanism it would need
-to be true.
+scale complete, every rule filed `done` against the mechanism it would need
+to be true, every text file `git ls-files` reports against the development
+addresses and host names the scans refuse, and every blob and commit message
+in the object database against the same matchers.
+
+The host-name half of both scans needs names from outside the tree, because
+naming them in a published file is the disclosure the scans exist to prevent.
+`HA_DEV_HOST_NAMES` carries them, comma or whitespace separated or as the path
+of a file listing them; with the variable unset the validator reads
+`docs/local/dev-hosts.txt`, which is excluded from the tree. Neither source
+supplying a name is a failure, so a run whose name half matched nothing cannot
+read as a run that found nothing. The object-database scan refuses a shallow
+clone for the same reason: a depth-1 checkout holds one commit object, so
+every message below the tip goes unread.
 
 `python tools/make_brand.py` regenerates `custom_components/sleepiq_massage/brand/`
 and measures what it wrote.
@@ -490,19 +502,26 @@ need only `asyncsleepiq`, and the Home Assistant layer tests, which need
 
 `tests/winposix.py` carries every shim the Home Assistant suite needs on a
 Windows workstation. Each one returns immediately on anything but Windows, so
-none of them does anything on the Linux CI runner.
+none of them does anything on the Linux CI runner. Three blocks stop the suite;
+the table is what each removal measured.
 
 | Blocker | Shim | Measured with the shim removed, 2026-09-16 |
 | --- | --- | --- |
 | `homeassistant/runner.py` imports `fcntl` and `homeassistant/util/resource.py` imports `resource`, both while pytest is still loading the harness plugin | `install_posix_modules()`, at import | Session aborts on `ModuleNotFoundError: No module named 'fcntl'`, 0 collected |
-| `pytest_socket` refuses the `socket.socketpair()` the proactor loop builds its wakeup pipe from | `install_socketpair_escape()` | 74 errors, the whole `tests/ha` directory |
-| `aiodns`, which aiohttp resolves with, refuses the proactor loop Home Assistant picks on Windows | `use_selector_event_loop()` | 74 passed. Nothing in this suite resolves a name, so the shim is a guard against a test that does, not a current dependency |
+| `pytest_socket` refuses the `socket.socketpair()` the proactor loop builds its wakeup pipe from | `install_socketpair_escape()` | 77 errors, the whole `tests/ha` directory |
+
+`use_selector_event_loop()` is a fourth shim and stops none of this suite.
+`aiodns`, which aiohttp resolves with, refuses the proactor loop Home Assistant
+picks on Windows. Measured 2026-09-16 with the call replaced by a no-op and the
+loop factory left as `ProactorEventLoop`: 77 passed, the same count as the
+pristine run. It guards the first test here that resolves a name.
 
 `pyproject.toml` loads the module with `-p tests.winposix`, which pytest
 handles before the entry point plugins. `tests/ha/conftest.py` calls
-`install_ha_layer_shims()` for the last two, which need Home Assistant
-importable. Run pytest as `python -m pytest`, on either platform, so the
-repository root is on `sys.path`: a bare `pytest` stops with
+`install_ha_layer_shims()` for the socketpair escape and the selector loop,
+which need Home Assistant importable. Run pytest as `python -m pytest`, on
+either platform, so the repository root is on `sys.path`: a bare `pytest` stops
+with
 `Error importing plugin "tests.winposix"` unless the root is on `PYTHONPATH`.
 CI runs it as a module for the same reason.
 

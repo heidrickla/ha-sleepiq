@@ -7,11 +7,19 @@ recorded upstream hashes, translation keys against icons and names, exceptions
 raised against exceptions declared, user-facing exceptions raised without a
 translation key, the manifest's published URLs against private address space,
 the brand images against their required pixel sizes, the version fields
-against each other, the quality scale against the pinned rule list, and every
+against each other, the quality scale against the pinned rule list, every
 rule marked `done` against the file set that would have to exist for it to be
-true. Run it before a push so the push is not the first verification.
+true, every text file git ships against the development addresses and names
+those scans refuse, and every blob and commit message in the object database
+against the same matchers. Run it before a push so the push is not the first
+verification.
 
     python tools/validate_local.py
+
+The development host names come from `HA_DEV_HOST_NAMES` or from
+`docs/local/dev-hosts.txt`, which is not part of the tree. Neither source
+supplying a name is a failure: the address half would pass while the name half
+matched nothing.
 """
 
 from __future__ import annotations
@@ -396,21 +404,29 @@ ALLOWED_HOSTS = frozenset(
 
 # Development host names are matched as well as addresses, and they cannot be
 # listed here: naming them in a published file is the disclosure this rule
-# exists to prevent. The environment carries them in from outside the tree.
+# exists to prevent. The environment or an untracked file carries them in from
+# outside the tree.
 DEV_HOST_ENV = "HA_DEV_HOST_NAMES"
+DEV_HOST_FILE = ("docs", "local", "dev-hosts.txt")
 
 
 def internal_names() -> list[str]:
-    """Development host names, from the environment, for the scans to refuse.
+    """Development host names for the scans to refuse.
 
-    The variable holds the names comma or whitespace separated, or holds the
-    path of a file with one name per line and `#` starting a comment. Each
-    name matches with any trailing word characters, so a bare name also
-    catches the same name with a role or a number appended. No example name
-    is written here: this file is scanned too, and a literal example is a hit
-    the moment someone supplies that name.
+    `HA_DEV_HOST_NAMES` holds the names comma or whitespace separated, or
+    holds the path of a file with one name per line and `#` starting a
+    comment. With the variable unset, `docs/local/dev-hosts.txt` is read in
+    the same file form; that path is excluded from the tree, so the names
+    reach the scans without being published. Each name matches with any
+    trailing word characters, so a bare name also catches the same name with a
+    role or a number appended. No example name is written here: this file is
+    scanned too, and a literal example is a hit the moment someone supplies
+    that name.
     """
     raw = os.environ.get(DEV_HOST_ENV, "").strip()
+    if not raw:
+        fallback = os.path.join(ROOT, *DEV_HOST_FILE)
+        raw = fallback if os.path.isfile(fallback) else ""
     if not raw:
         return []
     if os.path.isfile(raw):
@@ -720,12 +736,54 @@ def netblock_blobs(records: list[tuple[str, str, bytes]]) -> set[str]:
     return shas
 
 
+def git_line(*args: str) -> str | None:
+    """The first line `git args` prints, stripped. None when git cannot run."""
+    try:
+        proc = _subprocess.run(
+            ["git", *args],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except OSError, _subprocess.SubprocessError:
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip()
+
+
+def refuse_truncated_history(records: list[tuple[str, str, bytes]]) -> None:
+    """Refuse an object database that holds too little history to scan.
+
+    `actions/checkout` fetches depth 1 by default. That database holds the tip
+    commit and no other commit message, so every message below the tip passes
+    unread and the run is a clean result computed from objects it never saw.
+    Measured 2026-09-16: a `--depth 1` clone of this repository scans 51
+    objects and exits 0; a full clone of the same HEAD scans 347 and exits 1.
+    """
+    check(
+        git_line("rev-parse", "--is-shallow-repository") != "true",
+        "the object database is shallow, so the scan read the tip commit "
+        "message and no other - fetch the full history before running this",
+    )
+    commits = sum(1 for _sha, kind, _body in records if kind == "commit")
+    refs = git_line("for-each-ref", "--format=%(refname)")
+    ref_count = len(refs.splitlines()) if refs else 0
+    check(
+        commits > 1 or ref_count < 2,
+        f"the object database holds {commits} commit object across "
+        f"{ref_count} refs, so the scan read a truncated history",
+    )
+
+
 def scan_object_database(name_re: Any = None) -> None:
     """Refuse a development host in any object this clone can serve by SHA."""
     records = object_records()
     if records is None:
         notes.append("git not available - the object database was not scanned")
         return
+    refuse_truncated_history(records)
     exempt = netblock_blobs(records) | set(SCAN_EXEMPT_OBJECTS)
     seen = 0
     for sha, kind, body in records:
@@ -1052,10 +1110,14 @@ def main() -> int:
     # file is the disclosure these scans exist to prevent. Both scans get them.
     dev_names = internal_names()
     dev_name_re = name_matcher(dev_names)
-    notes.append(
-        f"{len(dev_names)} development host names given to the scans"
-        + ("" if dev_names else f" - set {DEV_HOST_ENV} to supply them")
-    )
+    if dev_names:
+        notes.append(f"{len(dev_names)} development host names given to the scans")
+    else:
+        failures.append(
+            "no development host names reached the scans, so their name half "
+            f"matched nothing - set {DEV_HOST_ENV} or write "
+            f"{'/'.join(DEV_HOST_FILE)}"
+        )
     scan_controls(dev_names, dev_name_re)
     scan_published_tree(dev_name_re)
     scan_object_database(dev_name_re)

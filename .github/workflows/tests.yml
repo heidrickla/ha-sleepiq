@@ -13,7 +13,13 @@ jobs:
     if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth 0, not the default 1. The object-database scan in
+      # tools/validate_local.py reads every commit message; a depth-1 checkout
+      # holds one commit object and the scan reports a clean result it never
+      # measured.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       # Home Assistant 2026.x needs Python 3.14.
       - uses: actions/setup-python@v5
         with:
@@ -42,4 +48,10 @@ jobs:
           --cov=custom_components/sleepiq_massage --cov-append
           --cov-report=term-missing --cov-fail-under=95
       - run: .venv/bin/python -m mypy custom_components/sleepiq_massage
+      # The name half of both scans matches nothing without names, and the
+      # names cannot live in the tree. The secret carries them in; the
+      # validator fails when neither it nor docs/local/dev-hosts.txt supplies
+      # one, so a run missing the secret is loud rather than green.
       - run: .venv/bin/python tools/validate_local.py
+        env:
+          HA_DEV_HOST_NAMES: ${{ secrets.HA_DEV_HOST_NAMES }}
