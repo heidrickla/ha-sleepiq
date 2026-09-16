@@ -1,6 +1,5 @@
 {
   "name": "SleepIQ (with massage)",
-  "country": ["US"],
   "homeassistant": "2026.8.0",
   "render_readme": true
 }
