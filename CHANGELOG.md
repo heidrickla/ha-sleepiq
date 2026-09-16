@@ -7,9 +7,10 @@ Newest first, in the style of
 
 ### Changed
 
-- Breaking: the domain is now `sleepiq_massage`. 0.1.0 used `sleepiq`, which is
-  a core integration's domain, and HACS excludes a custom integration that
-  overrides a core one. HACS installs this version into
+- Breaking: the domain is now `sleepiq_massage`. 0.1.0 used `sleepiq`, a core
+  integration's domain, and a custom component under a core domain shadows the
+  built-in one entirely: Home Assistant loads `custom_components/sleepiq` in
+  preference to core's `sleepiq`. HACS installs this version into
   `config/custom_components/sleepiq_massage` and leaves
   `config/custom_components/sleepiq` on disk, where the 0.1.0 code keeps
   shadowing core's built-in `sleepiq` and never updates again. Delete that
@@ -50,6 +51,12 @@ Newest first, in the style of
 - The diagnostics download no longer carries the bed's name, which owners set
   to a room or a person, and no longer dumps `entry.data` wholesale, which
   would have shipped anything the deprecated YAML block put in the entry.
+- A failed YAML import now aborts with a dialog that has text.
+  `async_step_import` aborts with reason `cannot_connect` or `invalid_auth`,
+  both of which were declared only under `config.error`, which is read for an
+  in-form error and not for an abort, so the reason resolved to no string.
+  Both are now declared under `config.abort` as well, in `strings.json` and
+  `translations/en.json`. Core's `sleepiq` has the same gap at 2026.8.3.
 
 ### Development
 
@@ -69,6 +76,14 @@ Newest first, in the style of
   the whole section.
 - Every Windows test shim lives in `tests/winposix.py`; `tests/ha/conftest.py`
   calls `install_ha_layer_shims()` instead of carrying its own copies.
+- `tools/validate_local.py` also runs those matchers over every blob and commit
+  message in `git cat-file --batch-all-objects`. The tree scan reads the index,
+  so an object no ref reaches passes it, and a forge serves an unreachable
+  commit by its SHA. Measured on this clone: exit 1 naming three orphaned
+  blobs; on a fresh clone, which carries only reachable objects, 271 objects
+  scanned and exit 0. A version of `tools/_netblocks.py` is skipped by its name
+  in the tree; two commit messages that state the pinned CIDRs are skipped by
+  SHA in `SCAN_EXEMPT_OBJECTS`.
 
 ## [0.1.0] - 2026-09-05
 
