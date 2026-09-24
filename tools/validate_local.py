@@ -1216,7 +1216,11 @@ def main() -> int:
                 status = status.get("status") if isinstance(status, dict) else status
                 check(status != "done", f"{rule}: filed done but {message}")
         except ImportError:
-            notes.append("PyYAML not installed - quality_scale.yaml not parsed")
+            check(
+                False,
+                "PyYAML not installed - quality_scale.yaml was not parsed, so its "
+                "checks did not run; run under the repo .venv",
+            )
 
     # ------------------------------------------ entity and icon translations
     # Every entity in this integration is named from strings.json through a
