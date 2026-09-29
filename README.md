@@ -1,34 +1,20 @@
 # SleepIQ (with massage)
 
-Home Assistant's built-in `sleepiq` integration exposes firmness, head and foot
-position, foundation presets, under-bed lights, pause mode and the sleep
-sensors of a SleepNumber bed, but no massage. This custom component adds it:
-per side, the full-body pattern, the head and foot motor speeds and the massage
-timer, read back from the bed rather than assumed.
+Home Assistant's built-in `sleepiq` integration exposes firmness, head and foot position, foundation presets, under-bed lights, pause mode and the sleep sensors of a SleepNumber bed, but no massage. This custom component adds it: per side, the full-body pattern, the head and foot motor speeds and the massage timer, read back from the bed rather than assumed.
 
-The domain is `sleepiq_massage`. It is a copy of the core integration with
-massage support layered on, under its own domain, so it installs beside core's
-`sleepiq` rather than replacing it. Everything core does, this does too; the
-massage entities are the addition.
+The domain is `sleepiq_massage`. It is a copy of the core integration with massage support layered on, under its own domain, so it installs beside core's `sleepiq` rather than replacing it. Everything core does, this does too; the massage entities are the addition.
 
 ## Why core does not have it
 
 The gap is not in Home Assistant, and it is not that beds lack the hardware.
 
-`asyncsleepiq`, the library core depends on, can write massage but never reads
-it. `SleepIQFoundation.set_foundation_massage()` ships and works, but the
-library has no massage object, nothing calls `GET bed/{id}/foundation/massage`,
-and the response fields (`footMassageMotorSpeed`, `headMassageMotorSpeed`,
-`waveMode`, `massageTimer`) appear nowhere in it.
+`asyncsleepiq`, the library core depends on, can write massage but never reads it. `SleepIQFoundation.set_foundation_massage()` ships and works, but the library has no massage object, nothing calls `GET bed/{id}/foundation/massage`, and the response fields (`footMassageMotorSpeed`, `headMassageMotorSpeed`, `waveMode`, `massageTimer`) appear nowhere in it.
 
-Without readback there is no state for an entity to display, so core exposes
-none. This repo fills in the read half and reuses the library's existing write
-half: no library fork, no patched dependency.
+Without readback there is no state for an entity to display, so core exposes none. This repo fills in the read half and reuses the library's existing write half: no library fork, no patched dependency.
 
 ## Relationship to core's SleepIQ
 
-There is no migration from core. Both integrations sign in to the same account
-and create their own devices and entities.
+There is no migration from core. Both integrations sign in to the same account and create their own devices and entities.
 
 | Situation | What happens |
 | --- | --- |
@@ -38,50 +24,29 @@ and create their own devices and entities.
 | Upgrading from 0.1.0 of this repo | The 0.1.0 directory is left on disk and keeps shadowing core's `sleepiq`. Delete it, as below. |
 | A bed is discovered by DHCP | One card if core `sleepiq` is set up, because core's card only appears while core has no entry. Two otherwise, one per integration: take SleepIQ (with massage). Core's matcher is in Home Assistant itself; dropping this repo's matcher would leave core's card alone. |
 
-Unique ids are registered against this integration's own platform, so they
-never collide with core's even where the id string is the same.
+Unique ids are registered against this integration's own platform, so they never collide with core's even where the id string is the same.
 
 ### Upgrading from 0.1.0
 
-0.1.0 used domain `sleepiq`, so it lived in `config/custom_components/sleepiq`.
-HACS installs 0.2.0 into `config/custom_components/sleepiq_massage` and leaves
-the 0.1.0 directory where it is: `remove_local_directory()` is called only from
-`uninstall()`, never on an update, and the install path is derived from the
-manifest domain of the version being downloaded. Home Assistant loads
-`custom_components/sleepiq` in preference to the built-in `sleepiq`, so the
-0.1.0 copy keeps serving that config entry and HACS no longer tracks it to
-update it.
+0.1.0 used domain `sleepiq`, so it lived in `config/custom_components/sleepiq`. HACS installs 0.2.0 into `config/custom_components/sleepiq_massage` and leaves the 0.1.0 directory where it is: `remove_local_directory()` is called only from `uninstall()`, never on an update, and the install path is derived from the manifest domain of the version being downloaded. Home Assistant loads `custom_components/sleepiq` in preference to the built-in `sleepiq`, so the 0.1.0 copy keeps serving that config entry and HACS no longer tracks it to update it.
 
 Do this after the update:
 
 1. Delete `config/custom_components/sleepiq`.
-2. Restart Home Assistant. Core's built-in `sleepiq` takes over the 0.1.0
-   config entry and the massage entities disappear with the 0.1.0 code.
+2. Restart Home Assistant. Core's built-in `sleepiq` takes over the 0.1.0 config entry and the massage entities disappear with the 0.1.0 code.
 3. Add SleepIQ (with massage) from Add integration.
 4. Delete the old entry if you want one set of entities.
 
 ## Supported devices
 
-- Any SleepNumber bed registered to a SleepIQ account, through the SleepNumber
-  cloud. Every bed on the account is set up under one entry; each bed is one
-  device in Home Assistant.
-- Massage entities appear only for a bed whose FlexFit foundation reports the
-  massage board: `hasMassageAndLight`, which the library derives from bit 1 of
-  `fsBoardFeatures`. A bed without the board gets the core entities and no
-  dead massage controls.
-- Verified on hardware: a SelectComfort i8 on a FlexFit foundation
-  (`fsBoardFeatures = 7`) running Home Assistant 2026.8.2. Eight massage
-  entities were created, four per side, and the integration loaded with no
-  errors.
-- Climate360 and other Fuzion generation beds: the library drives them and the
-  core entities apply. The massage controls are built against the FlexFit
-  foundation above.
+- Any SleepNumber bed registered to a SleepIQ account, through the SleepNumber cloud. Every bed on the account is set up under one entry; each bed is one device in Home Assistant.
+- Massage entities appear only for a bed whose FlexFit foundation reports the massage board: `hasMassageAndLight`, which the library derives from bit 1 of `fsBoardFeatures`. A bed without the board gets the core entities and no dead massage controls.
+- Verified on hardware: a SelectComfort i8 on a FlexFit foundation (`fsBoardFeatures = 7`) running Home Assistant 2026.8.2. Eight massage entities were created, four per side, and the integration loaded with no errors.
+- Climate360 and other Fuzion generation beds: the library drives them and the core entities apply. The massage controls are built against the FlexFit foundation above.
 
 ## Supported functions
 
-Every entity below is created and enabled by default. Each bed is one device,
-and an entity's full name begins with the device name, which is the bed's name
-in the SleepIQ app, so the tables show the part that follows it.
+Every entity below is created and enabled by default. Each bed is one device, and an entity's full name begins with the device name, which is the bed's name in the SleepIQ app, so the tables show the part that follows it.
 
 Per sleeper, from core:
 
@@ -101,13 +66,7 @@ Per sleeper, from core:
 | `{bed} {sleeper} core climate` | `select` | Climate360 heating and cooling levels (beds with core climate) |
 | `{bed} {sleeper} core climate timer` | `number` | Core climate run time, 0 to 600 minutes |
 
-The last four are hardware fitted per side of the bed, named after whoever
-sleeps on that side. Core keys the foot warmer and core climate selects on the
-sleeper, and a side with nobody registered on it falls back to the first
-sleeper: on a bed with one registered sleeper both sides then ask for the same
-unique id and Home Assistant keeps only the first entity. Here they are keyed on
-the bed and the physical side, like the two timer numbers beside them, so the
-bed gets both.
+The last four are hardware fitted per side of the bed, named after whoever sleeps on that side. Core keys the foot warmer and core climate selects on the sleeper, and a side with nobody registered on it falls back to the first sleeper: on a bed with one registered sleeper both sides then ask for the same unique id and Home Assistant keeps only the first entity. Here they are keyed on the bed and the physical side, like the two timer numbers beside them, so the bed gets both.
 
 Per bed, from core:
 
@@ -120,11 +79,9 @@ Per bed, from core:
 | `{bed} Calibrate` | `button` | Re-baseline the pressure sensors. Filed under Configuration on the device page, because it sets the bed up rather than operating it |
 | `{bed} Stop pump` | `button` | Stop a firmness adjustment in progress |
 
-A foundation that reports no side names its positions and its preset without
-one: `{bed} Head position`, `{bed} Foundation preset`.
+A foundation that reports no side names its positions and its preset without one: `{bed} Head position`, `{bed} Foundation preset`.
 
-Per side, added by this repository, for beds whose foundation reports the
-massage board:
+Per side, added by this repository, for beds whose foundation reports the massage board:
 
 | Entity | Platform | Values |
 | --- | --- | --- |
@@ -133,44 +90,25 @@ massage board:
 | `{bed} {sleeper} head massage speed` | `select` | `off`, `low`, `medium`, `high` |
 | `{bed} {sleeper} massage timer` | `number` | 0 to 60 minutes |
 
-The option keys are the library's enum names, spelling included: an automation
-must send `revitilize`, not `revitalize`. The labels shown in the UI are the
-vendor app's own: Smooth, Revitalize, Wave.
+The option keys are the library's enum names, spelling included: an automation must send `revitilize`, not `revitalize`. The labels shown in the UI are the vendor app's own: Smooth, Revitalize, Wave.
 
-The massage entities are named by sleeper rather than by physical side, so the
-mode entity for the right-hand sleeper reads "Amy massage mode" and not "Right
-massage mode". That matches how core names the other per-sleeper comfort
-hardware, the foot warmer and core climate. A side with no sleeper on the
-account is named by position. Under the hood each entity is keyed on the bed
-and the physical side, so a bed with one sleeper still gets two independent
-sets of controls.
+The massage entities are named by sleeper rather than by physical side, so the mode entity for the right-hand sleeper reads "Amy massage mode" and not "Right massage mode". That matches how core names the other per-sleeper comfort hardware, the foot warmer and core climate. A side with no sleeper on the account is named by position. Under the hood each entity is keyed on the bed and the physical side, so a bed with one sleeper still gets two independent sets of controls.
 
-There are no actions (services), triggers or conditions; every function is an
-entity.
+There are no actions (services), triggers or conditions; every function is an entity.
 
 ## Installation
 
-HACS: add this repository as a custom repository (category: Integration),
-install, restart Home Assistant.
+HACS: add this repository as a custom repository (category: Integration), install, restart Home Assistant.
 
-Manual: copy `custom_components/sleepiq_massage/` into your config directory's
-`custom_components/`, then restart.
+Manual: copy `custom_components/sleepiq_massage/` into your config directory's `custom_components/`, then restart.
 
-Either way Home Assistant logs that it found a custom integration
-`sleepiq_massage` which it has not tested. That is expected of any custom
-integration.
+Either way Home Assistant logs that it found a custom integration `sleepiq_massage` which it has not tested. That is expected of any custom integration.
 
-Then add it from Settings > Devices & services > Add integration > SleepIQ
-(with massage). Read Relationship to core's SleepIQ above first if core's
-`sleepiq` is already set up.
+Then add it from Settings > Devices & services > Add integration > SleepIQ (with massage). Read Relationship to core's SleepIQ above first if core's `sleepiq` is already set up.
 
 Minimum Home Assistant version: 2026.8.0.
 
-`hacs.json` sets no `country`. That key filters the store listing to the
-countries it names, hiding the repository from everyone else. The SleepIQ cloud
-is one global endpoint with no regional variant, and neither this integration
-nor `asyncsleepiq` reads a country, so a bed works wherever it is. Sleep
-Number's retail footprint is a purchase constraint, not an operating one.
+`hacs.json` sets no `country`. That key filters the store listing to the countries it names, hiding the repository from everyone else. The SleepIQ cloud is one global endpoint with no regional variant, and neither this integration nor `asyncsleepiq` reads a country, so a bed works wherever it is. Sleep Number's retail footprint is a purchase constraint, not an operating one.
 
 ### Installation parameters
 
@@ -181,21 +119,9 @@ Number's retail footprint is a purchase constraint, not an operating one.
 
 ### Discovery
 
-A SleepNumber bed on the same network is picked up by Home Assistant's DHCP
-watcher. Core's `sleepiq` claims the same MAC prefix `64DBA0*` and Home
-Assistant appends a custom integration's matchers to core's list instead of
-replacing them, so one bed raises two cards: SleepIQ and SleepIQ (with massage).
-Take the second. Core's card stays in the discovered list until it is set up or
-ignored, and setting it up gives a second set of entities for the same bed. Core
-raises its card only while core has no config entry of its own, so a user who
-already runs core's `sleepiq` sees one card, this one.
+A SleepNumber bed on the same network is picked up by Home Assistant's DHCP watcher. Core's `sleepiq` claims the same MAC prefix `64DBA0*` and Home Assistant appends a custom integration's matchers to core's list instead of replacing them, so one bed raises two cards: SleepIQ and SleepIQ (with massage). Take the second. Core's card stays in the discovered list until it is set up or ignored, and setting it up gives a second set of entities for the same bed. Core raises its card only while core has no config entry of its own, so a user who already runs core's `sleepiq` sees one card, this one.
 
-The bed announces nothing about which SleepIQ account owns it, and this
-integration talks to the cloud rather than to the bed, so the card opens the
-same sign-in form. When this integration already has an entry its card is not
-raised again: one entry covers every bed on the account. A second bed, or the
-same bed on a new DHCP lease, does not raise a second card either. An entry of
-core's does not suppress this card, and this one does not suppress core's.
+The bed announces nothing about which SleepIQ account owns it, and this integration talks to the cloud rather than to the bed, so the card opens the same sign-in form. When this integration already has an entry its card is not raised again: one entry covers every bed on the account. A second bed, or the same bed on a new DHCP lease, does not raise a second card either. An entry of core's does not suppress this card, and this one does not suppress core's.
 
 ### Configuration options
 
@@ -209,8 +135,7 @@ There are no options to configure after setup; the account is the only setting.
 
 ## Data updates
 
-Everything comes from the SleepNumber cloud; the bed itself is never contacted
-directly, so nothing on your network needs configuring.
+Everything comes from the SleepNumber cloud; the bed itself is never contacted directly, so nothing on your network needs configuring.
 
 | Data | Interval |
 | --- | --- |
@@ -219,33 +144,20 @@ directly, so nothing on your network needs configuring.
 | Pause mode | every 5 minutes |
 | Sleep score, duration, heart rate, respiratory rate, HRV | every hour |
 
-A write (firmness, position, massage, light) is sent immediately and the
-entity shows the new value straight away. The massage entities then request a
-refresh, so what you see a moment later is what the bed reports, not what was
-asked for. The cloud's own view of the bed can lag a few seconds behind the
-remote or the app.
+A write (firmness, position, massage, light) is sent immediately and the entity shows the new value straight away. The massage entities then request a refresh, so what you see a moment later is what the bed reports, not what was asked for. The cloud's own view of the bed can lag a few seconds behind the remote or the app.
 
-Beds added or removed on the account are followed. The 60 second poll reads
-the account's bed list; when it differs, the account is read again in full, a
-new bed gets its device and its entities, and a bed that has left loses its
-device and everything under it. No reload, no restart. A bed list that comes
-back empty is treated as a cloud hiccup and changes nothing.
+Beds added or removed on the account are followed. The 60 second poll reads the account's bed list; when it differs, the account is read again in full, a new bed gets its device and its entities, and a bed that has left loses its device and everything under it. No reload, no restart. A bed list that comes back empty is treated as a cloud hiccup and changes nothing.
 
 ## Use cases
 
-- Start a foot massage at bedtime and let the timer stop it, without reaching
-  for the remote.
+- Start a foot massage at bedtime and let the timer stop it, without reaching for the remote.
 - Stop a massage automatically when its sleeper gets out of bed.
-- Show the remaining massage time on a bedside dashboard next to the firmness
-  and position controls.
-- Put the whole bed to bed: flat preset, lights off, massage off, in one
-  script.
+- Show the remaining massage time on a bedside dashboard next to the firmness and position controls.
+- Put the whole bed to bed: flat preset, lights off, massage off, in one script.
 
 ## Examples
 
-Start a 20 minute low foot massage on one side at 22:00. The timer is set
-first and the motor started straight after, because the bed drops an idle
-timer (see the known limitations).
+Start a 20 minute low foot massage on one side at 22:00. The timer is set first and the motor started straight after, because the bed drops an idle timer (see the known limitations).
 
 ```yaml
 automation:
@@ -286,16 +198,13 @@ automation:
           option: "off"
 ```
 
-Entity ids follow the bed's name and the sleeper's first name; take the exact
-ids from Settings > Devices & services > SleepIQ (with massage) > the bed.
+Entity ids follow the bed's name and the sleeper's first name; take the exact ids from Settings > Devices & services > SleepIQ (with massage) > the bed.
 
 ## How the massage controls behave
 
 ### Mode and speed are mutually exclusive
 
-This is an API rule, not a UI choice. `set_foundation_massage()` forces both
-motor speeds to OFF whenever a wave mode is set, and the vendor app's massage
-screen says the same: "Adjust either foot and head or full body massage". So:
+This is an API rule, not a UI choice. `set_foundation_massage()` forces both motor speeds to OFF whenever a wave mode is set, and the vendor app's massage screen says the same: "Adjust either foot and head or full body massage". So:
 
 - Selecting a mode other than off drives both speed entities to off.
 - Selecting a non-off speed drives the mode entity to off.
@@ -304,22 +213,13 @@ If they did not, the UI would show a state the bed is not in.
 
 ### A speed write with no timer set sends 60 minutes
 
-Selecting a speed with no timer set sends `massageTimer: 60`, the maximum the
-vendor app and the physical remotes offer. It covers the expiry behaviour
-below: the bed drops an idle timer, so a speed started without one has nothing
-scheduled to stop it.
+Selecting a speed with no timer set sends `massageTimer: 60`, the maximum the vendor app and the physical remotes offer. It covers the expiry behaviour below: the bed drops an idle timer, so a speed started without one has nothing scheduled to stop it.
 
-A mode write sends `waveMode` on its own and no timer. Nothing schedules the
-end of a pattern from Home Assistant; see the full-body limitation below.
+A mode write sends `waveMode` on its own and no timer. Nothing schedules the end of a pattern from Home Assistant; see the full-body limitation below.
 
-An explicitly set timer is never overridden. The logic is
-`self.timer or MASSAGE_DEFAULT_TIMER`, matching how core defaults comparable
-hardware (`timer = self.foot_warmer.timer or 120`). Set 20 minutes and you get
-20; set nothing and you get 60.
+An explicitly set timer is never overridden. The logic is `self.timer or MASSAGE_DEFAULT_TIMER`, matching how core defaults comparable hardware (`timer = self.foot_warmer.timer or 120`). Set 20 minutes and you get 20; set nothing and you get 60.
 
-The 60 minute ceiling also corroborates the countdown reading: a capture of a
-running massage reported `massageTimer: 57`, which is what 57 minutes remaining
-of a 60 minute run looks like.
+The 60 minute ceiling also corroborates the countdown reading: a capture of a running massage reported `massageTimer: 57`, which is what 57 minutes remaining of a 60 minute run looks like.
 
 ### Verified on hardware
 
@@ -336,8 +236,7 @@ of a 60 minute run looks like.
 
 ### The timer expires if massage is not started
 
-`massageTimer` is exposed as a `number`, but it behaves as an armed countdown
-rather than a stored preference. Measured on hardware:
+`massageTimer` is exposed as a `number`, but it behaves as an armed countdown rather than a stored preference. Measured on hardware:
 
 | Action | Left | Right |
 | --- | --- | --- |
@@ -347,41 +246,21 @@ rather than a stored preference. Measured on hardware:
 | set right = 12 | 0.0 | **12.0** |
 | right speed -> low | 0.0 | **12.0** |
 
-The timers are per-side and independent. Setting one never moves the other, so
-the value on one side tells you nothing about the other. There is no shared
-bed-wide timer to read.
+The timers are per-side and independent. Setting one never moves the other, so the value on one side tells you nothing about the other. There is no shared bed-wide timer to read.
 
-An idle timer clears itself. Left was set to 7 and read back 7, then fell to 0
-within 45 seconds with no motors running. The right side, which had a motor
-started while its timer was set, held its value. A speed write does not disturb
-the timer, as the fourth and fifth rows show. The consistent reading is that
-the bed arms the timer and drops it if a massage does not begin, within 45
-seconds on the left side above.
+An idle timer clears itself. Left was set to 7 and read back 7, then fell to 0 within 45 seconds with no motors running. The right side, which had a motor started while its timer was set, held its value. A speed write does not disturb the timer, as the fourth and fifth rows show. The consistent reading is that the bed arms the timer and drops it if a massage does not begin, within 45 seconds on the left side above.
 
-So: set the timer, then start the massage promptly. Setting a timer and walking
-away leaves nothing armed.
+So: set the timer, then start the massage promptly. Setting a timer and walking away leaves nothing armed.
 
 ### The full-body patterns cannot be set from Home Assistant
 
-Foot and head speed control works. The Full Body patterns, Smooth, Revitalize
-and Wave, can be read but not written.
+Foot and head speed control works. The Full Body patterns, Smooth, Revitalize and Wave, can be read but not written.
 
-The read side is correct. Confirmed on hardware: setting Smooth for 1 hour from
-the vendor phone app showed up in Home Assistant within one poll as
-`mode=soothe`, `timer=60.0`, counting down to 58 a couple of minutes later. So
-`waveMode 1 = Smooth`, the timer is in minutes, and 60 is the maximum.
+The read side is correct. Confirmed on hardware: setting Smooth for 1 hour from the vendor phone app showed up in Home Assistant within one poll as `mode=soothe`, `timer=60.0`, counting down to 58 a couple of minutes later. So `waveMode 1 = Smooth`, the timer is in minutes, and 60 is the maximum.
 
-On naming: the app's Full Body row is `Off / Smooth / Revitalize / Wave`; the
-library enum is `OFF=0 / SOOTHE=1 / REVITILIZE=2 / WAVE=3`, the same order, so
-`SOOTHE` is Smooth. The translations use the app's wording; the option keys
-keep the library's spelling.
+On naming: the app's Full Body row is `Off / Smooth / Revitalize / Wave`; the library enum is `OFF=0 / SOOTHE=1 / REVITILIZE=2 / WAVE=3`, the same order, so `SOOTHE` is Smooth. The translations use the app's wording; the option keys keep the library's spelling.
 
-The write starts the pattern but it does not sustain. The request is not
-rejected. The bed's owner watched the mattress and reported that the side did
-turn on for a while during a test that Home Assistant had recorded as a total
-failure. The pattern starts, runs briefly, and stops, and because `waveMode`
-reads back `0` once it has stopped, the API view alone made it look like
-nothing had happened.
+The write starts the pattern but it does not sustain. The request is not rejected. The bed's owner watched the mattress and reported that the side did turn on for a while during a test that Home Assistant had recorded as a total failure. The pattern starts, runs briefly, and stops, and because `waveMode` reads back `0` once it has stopped, the API view alone made it look like nothing had happened.
 
 Three request shapes have been tried, all on an idle side:
 
@@ -391,28 +270,17 @@ Three request shapes have been tried, all on an idle side:
 | `waveMode` + `massageTimer` | starts, stops |
 | `waveMode` alone | starts, stops |
 
-A pattern set from the vendor phone app persists, so the correct request
-differs from all three above.
+A pattern set from the vendor phone app persists, so the correct request differs from all three above.
 
-One hypothesis, from the app's own UI: the massage screen gives Full Body its
-own Start Timer, separate from the Foot/Head one. A pattern may need that timer
-armed through a different field or endpoint, and without it the foundation runs
-a brief burst and stops.
+One hypothesis, from the app's own UI: the massage screen gives Full Body its own Start Timer, separate from the Foot/Head one. A pattern may need that timer armed through a different field or endpoint, and without it the foundation runs a brief burst and stops.
 
-Writes use the app's partial-payload dialect rather than the library's
-all-five-fields call: `{"footMassageMotor": N, "headMassageMotor": N,
-"massageTimer": N, "side": "R"}`, matching what the app was observed sending.
+Writes use the app's partial-payload dialect rather than the library's all-five-fields call: `{"footMassageMotor": N, "headMassageMotor": N, "massageTimer": N, "side": "R"}`, matching what the app was observed sending.
 
 ### Other limitations
 
-- This is a copy of core's `sleepiq`. When Home Assistant updates its copy,
-  this one does not follow until it is resynced (see below).
-- One failed read of any endpoint marks every entity of that poll unavailable
-  until the next successful one.
-- A bed is followed by the account's list, not by anything the bed itself
-  announces, so a bed that the cloud stops listing while it is still yours,
-  during an outage that answers with a short list rather than an error, would
-  be removed. An empty list is ignored, a short one is not.
+- This is a copy of core's `sleepiq`. When Home Assistant updates its copy, this one does not follow until it is resynced (see below).
+- One failed read of any endpoint marks every entity of that poll unavailable until the next successful one.
+- A bed is followed by the account's list, not by anything the bed itself announces, so a bed that the cloud stops listing while it is still yours, during an outage that answers with a short list rather than an error, would be removed. An empty list is ignored, a short one is not.
 
 ## Troubleshooting
 
@@ -430,32 +298,21 @@ all-five-fields call: `{"footMassageMotor": N, "headMassageMotor": N,
 | A repair notice about the SleepIQ YAML configuration | The `sleepiq_massage:` block in `configuration.yaml` was imported into a config entry and now does nothing | Delete the block and restart. The notice clears with it and the account keeps working from the config entry |
 | Two of every entity, or entity ids ending in `_2` | Core's `sleepiq` is set up on the same account | Delete one of the two config entries. See Relationship to core's SleepIQ |
 
-Diagnostics: Settings > Devices & services > SleepIQ (with massage) > three
-dots > Download diagnostics. The file lists the beds, sleepers, foundation
-features and the raw massage block, with the account, the bed's name, its MAC
-address and the sleepers' first names redacted. The mode select also keeps the
-raw massage block as attributes, so it can be watched live while the vendor app
-drives the bed.
+Diagnostics: Settings > Devices & services > SleepIQ (with massage) > three dots > Download diagnostics. The file lists the beds, sleepers, foundation features and the raw massage block, with the account, the bed's name, its MAC address and the sleepers' first names redacted. The mode select also keeps the raw massage block as attributes, so it can be watched live while the vendor app drives the bed.
 
 ## Removal
 
-1. Settings > Devices & services > SleepIQ (with massage) > three dots >
-   Delete removes the config entry, its devices and entities.
-2. Remove the component: in HACS, open SleepIQ (with massage) and choose
-   Remove; for a manual install delete `custom_components/sleepiq_massage/`.
+1. Settings > Devices & services > SleepIQ (with massage) > three dots > Delete removes the config entry, its devices and entities.
+2. Remove the component: in HACS, open SleepIQ (with massage) and choose Remove; for a manual install delete `custom_components/sleepiq_massage/`.
 3. Restart Home Assistant.
 
-Nothing is stored outside the config entry. Core's `sleepiq`, if it is set up,
-is untouched: it has its own config entry, its own entities and its own
-history.
+Nothing is stored outside the config entry. Core's `sleepiq`, if it is set up, is untouched: it has its own config entry, its own entities and its own history.
 
 ## Keeping in sync with core
 
 When Home Assistant updates `sleepiq`, this copy does not follow.
 
-`docs/UPSTREAM-BASELINE.txt` records the SHA-256 of each file as copied from
-`home-assistant/core` at tag 2026.8.2, and marks the files this project
-modifies. To resync:
+`docs/UPSTREAM-BASELINE.txt` records the SHA-256 of each file as copied from `home-assistant/core` at tag 2026.8.2, and marks the files this project modifies. To resync:
 
 ```bash
 # fetch the same files at a newer tag and compare against the baseline
@@ -463,47 +320,22 @@ curl -s -o /tmp/select.py   https://raw.githubusercontent.com/home-assistant/cor
 sha256sum /tmp/select.py
 ```
 
-A changed hash means upstream moved and that file needs this project's changes
-re-applied. `NOTICE` lists exactly what those are, file by file. Every file is
-marked `modified`: naming, icons and error handling run through all seven
-platforms, so there is no untouched file to compare byte for byte. The recorded
-hashes remain the starting point of the next resync diff, and
-`python tools/validate_local.py` checks that every modified file is described.
+A changed hash means upstream moved and that file needs this project's changes re-applied. `NOTICE` lists exactly what those are, file by file. Every file is marked `modified`: naming, icons and error handling run through all seven platforms, so there is no untouched file to compare byte for byte. The recorded hashes remain the starting point of the next resync diff, and `python tools/validate_local.py` checks that every modified file is described.
 
 ## Development
 
-`python tools/validate_local.py` runs the offline checks: the vendored files
-against the baseline, translations against icons and code, every user-facing
-exception translated, the manifest's published URLs against private address
-space, the brand images against their required sizes, `PARALLEL_UPDATES` on
-every platform, no `_attr_name` or `_attr_icon` left anywhere, the quality
-scale complete, every rule filed `done` against the mechanism it would need
-to be true, every text file `git ls-files` reports against the development
-addresses, host names and infrastructure phrases the scans refuse, every blob
-and commit message in the object database against the same address matchers,
-and `git ls-files --cached` against the paths a clone must never carry.
+`python tools/validate_local.py` runs the offline checks: the vendored files against the baseline, translations against icons and code, every user-facing exception translated, the manifest's published URLs against private address space, the brand images against their required sizes, `PARALLEL_UPDATES` on every platform, no `_attr_name` or `_attr_icon` left anywhere, the quality scale complete, every rule filed `done` against the mechanism it would need to be true, every text file `git ls-files` reports against the development addresses, host names and infrastructure phrases the scans refuse, every blob and commit message in the object database against the same address matchers, and `git ls-files --cached` against the paths a clone must never carry.
 
-The host-name and phrase halves need their input from outside the tree,
-because writing it into a published file is the disclosure the scans exist to
-prevent.
+The host-name and phrase halves need their input from outside the tree, because writing it into a published file is the disclosure the scans exist to prevent.
 
 | Half | Variable | File read when the variable is unset |
 | --- | --- | --- |
 | Development host names | `HA_DEV_HOST_NAMES` | `~/.config/ha-dev-hosts.txt` |
 | Infrastructure phrases | `HA_DEV_PRIVATE_PHRASES` | `~/.config/ha-dev-phrases.txt` |
 
-Either variable holds the values directly or holds the path of a file listing
-them. Both fallback paths are outside every clone, so no clone can stage the
-input and nothing here asks a reader to create a file inside the tree. An
-in-tree fallback was the previous design: git ignored that path through
-`.git/info/exclude`, which no clone receives, so in a fresh clone the file the
-fallback asked for was a staged file and a scan failure.
+Either variable holds the values directly or holds the path of a file listing them. Both fallback paths are outside every clone, so no clone can stage the input and nothing here asks a reader to create a file inside the tree. An in-tree fallback was the previous design: git ignored that path through `.git/info/exclude`, which no clone receives, so in a fresh clone the file the fallback asked for was a staged file and a scan failure.
 
-An absent input is a failure off CI, so a clean local exit means the half ran.
-Under `CI` it is a note naming the variable, because no workflow supplies
-either input. The object-database scan refuses a shallow clone for the same
-reason: a depth-1 checkout holds one commit object, so every message below the
-tip goes unread.
+An absent input is a failure off CI, so a clean local exit means the half ran. Under `CI` it is a note naming the variable, because no workflow supplies either input. The object-database scan refuses a shallow clone for the same reason: a depth-1 checkout holds one commit object, so every message below the tip goes unread.
 
 | Half | Where it runs | Observed 2026-09-16 |
 | --- | --- | --- |
@@ -511,112 +343,51 @@ tip goes unread.
 | Development host names, and the control proving the name rule fired | Locally only | The same clone with `HA_DEV_HOST_NAMES` set to a name the tree carries exits 1 and reports the file, the line and the rule |
 | Infrastructure phrases, and the control proving the phrase rule fired | Locally only | The same clone with `HA_DEV_PRIVATE_PHRASES` set to a phrase appended to `README.md` exits 1 and reports the file, the line and the rule |
 
-A development host name written into the tree is caught by the run a
-maintainer makes before pushing, and by nothing in CI.
+A development host name written into the tree is caught by the run a maintainer makes before pushing, and by nothing in CI.
 
-The phrase half covers prose that names private CI topology, account structure
-or lab tooling and contains no host, no address and no private suffix, which is
-a class no address matcher can see. It reads the published tree only. The
-object database holds commit messages of that class which no rewrite here can
-reach, so a matcher over them would refuse history rather than the next commit.
+The phrase half covers prose that names private CI topology, account structure or lab tooling and contains no host, no address and no private suffix, which is a class no address matcher can see. It reads the published tree only. The object database holds commit messages of that class which no rewrite here can reach, so a matcher over them would refuse history rather than the next commit.
 
-`.gitignore` cannot keep a working-copy path out of a clone: the ignore file
-ships, so its rules describe the files they hide, and a rule moved to
-`.git/info/exclude` protects the one machine that holds the file.
-`refuse_unpublished_paths` fails instead when `.claude/`, `.cursorrules`,
-`AGENTS.md`, `CLAUDE.md` or `docs/local/` is tracked, and that check travels
-with the tree. The tree scan skips `docs/local/`, so a maintainer's notes
-beside the repository are neither read nor named in a failure.
+`.gitignore` cannot keep a working-copy path out of a clone: the ignore file ships, so its rules describe the files they hide, and a rule moved to `.git/info/exclude` protects the one machine that holds the file. `refuse_unpublished_paths` fails instead when `.claude/`, `.cursorrules`, `AGENTS.md`, `CLAUDE.md` or `docs/local/` is tracked, and that check travels with the tree. The tree scan skips `docs/local/`, so a maintainer's notes beside the repository are neither read nor named in a failure.
 
-A matched string is printed locally, because it is what the maintainer greps
-for, and withheld when `CI` or `GITHUB_ACTIONS` is set to anything but `0` or
-`false`. The file, the line and the rule that fired are kept either way.
-Nothing derived from the string is printed: a truncated digest of a short host
-name is confirmable against a candidate list. The environment decides rather
-than a flag, because a workflow that forgot the flag would publish the string.
+A matched string is printed locally, because it is what the maintainer greps for, and withheld when `CI` or `GITHUB_ACTIONS` is set to anything but `0` or `false`. The file, the line and the rule that fired are kept either way. Nothing derived from the string is printed: a truncated digest of a short host name is confirmable against a candidate list. The environment decides rather than a flag, because a workflow that forgot the flag would publish the string.
 
-The object scan withholds the matching object's SHA under the same rule. A SHA
-is a complete retrieval key on a public repository, through `git cat-file -p`
-in any clone and through the REST blob endpoint with no clone at all, so
-printing it beside a withheld string publishes what the string was withheld
-for. The number of failure lines is the number of matching objects, and a
-maintainer reads the SHAs from a local run.
+The object scan withholds the matching object's SHA under the same rule. A SHA is a complete retrieval key on a public repository, through `git cat-file -p` in any clone and through the REST blob endpoint with no clone at all, so printing it beside a withheld string publishes what the string was withheld for. The number of failure lines is the number of matching objects, and a maintainer reads the SHAs from a local run.
 
-The object scan counts what it did not read beside what it did: a blob that is
-not UTF-8 and a blob over the size limit leave the pass without a hit, and a
-count of scanned objects alone reads as coverage.
+The object scan counts what it did not read beside what it did: a blob that is not UTF-8 and a blob over the size limit leave the pass without a hit, and a count of scanned objects alone reads as coverage.
 
-No repository secret carries the names in. An undefined secret expands to the
-empty string, which reads as coverage and is not, and a defined one would put
-the name into the public run log the first time the name half matched.
+No repository secret carries the names in. An undefined secret expands to the empty string, which reads as coverage and is not, and a defined one would put the name into the public run log the first time the name half matched.
 
-Three commit messages reachable from `main` quote addresses in the refused
-space, in the measurements those commits record. Commit messages are not
-rewritten here, so the object scan exempts those objects by SHA with the
-reason on each line, and prints a count of the objects it exempts so the hole
-is visible in the run. None of the three is in the published history, so each
-address is still unpublished and a message rewrite has to reach it before the
-first push.
+Three commit messages reachable from `main` quote addresses in the refused space, in the measurements those commits record. Commit messages are not rewritten here, so the object scan exempts those objects by SHA with the reason on each line, and prints a count of the objects it exempts so the hole is visible in the run. None of the three is in the published history, so each address is still unpublished and a message rewrite has to reach it before the first push.
 
-`python tools/make_brand.py` regenerates `custom_components/sleepiq_massage/brand/`
-and measures what it wrote.
+`python tools/make_brand.py` regenerates `custom_components/sleepiq_massage/brand/` and measures what it wrote.
 
-`python -m pytest tests -q` runs both suites: the massage model tests, which
-need only `asyncsleepiq`, and the Home Assistant layer tests, which need
-`pytest-homeassistant-custom-component`.
+`python -m pytest tests -q` runs both suites: the massage model tests, which need only `asyncsleepiq`, and the Home Assistant layer tests, which need `pytest-homeassistant-custom-component`.
 
-`tests/winposix.py` carries every shim the Home Assistant suite needs on a
-Windows workstation. Each one returns immediately on anything but Windows, so
-none of them does anything on the Linux CI runner. Three blocks stop the suite;
-the table is what each removal measured.
+`tests/winposix.py` carries every shim the Home Assistant suite needs on a Windows workstation. Each one returns immediately on anything but Windows, so none of them does anything on the Linux CI runner. Three blocks stop the suite; the table is what each removal measured.
 
 | Blocker | Shim | Measured with the shim removed, 2026-09-16 |
 | --- | --- | --- |
 | `homeassistant/runner.py` imports `fcntl` and `homeassistant/util/resource.py` imports `resource`, both while pytest is still loading the harness plugin | `install_posix_modules()`, at import | Session aborts on `ModuleNotFoundError: No module named 'fcntl'`, 0 collected |
 | `pytest_socket` refuses the `socket.socketpair()` the proactor loop builds its wakeup pipe from | `install_socketpair_escape()` | 77 errors, the whole `tests/ha` directory |
 
-`use_selector_event_loop()` is a fourth shim and stops none of this suite.
-`aiodns`, which aiohttp resolves with, refuses the proactor loop Home Assistant
-picks on Windows. Measured 2026-09-16 with the call replaced by a no-op and the
-loop factory left as `ProactorEventLoop`: 77 passed, the same count as the
-pristine run. It guards the first test here that resolves a name.
+`use_selector_event_loop()` is a fourth shim and stops none of this suite. `aiodns`, which aiohttp resolves with, refuses the proactor loop Home Assistant picks on Windows. Measured 2026-09-16 with the call replaced by a no-op and the loop factory left as `ProactorEventLoop`: 77 passed, the same count as the pristine run. It guards the first test here that resolves a name.
 
-`pyproject.toml` loads the module with `-p tests.winposix`, which pytest
-handles before the entry point plugins. `tests/ha/conftest.py` calls
-`install_ha_layer_shims()` for the socketpair escape and the selector loop,
-which need Home Assistant importable. Run pytest as `python -m pytest`, on
-either platform, so the repository root is on `sys.path`: a bare `pytest` stops
-with
-`Error importing plugin "tests.winposix"` unless the root is on `PYTHONPATH`.
-CI runs it as a module for the same reason.
+`pyproject.toml` loads the module with `-p tests.winposix`, which pytest handles before the entry point plugins. `tests/ha/conftest.py` calls `install_ha_layer_shims()` for the socketpair escape and the selector loop, which need Home Assistant importable. Run pytest as `python -m pytest`, on either platform, so the repository root is on `sys.path`: a bare `pytest` stops with `Error importing plugin "tests.winposix"` unless the root is on `PYTHONPATH`. CI runs it as a module for the same reason.
 
-On Windows the first test of a session can still fail the harness's own
-teardown check on a lingering shutdown thread; the assertions themselves run.
+On Windows the first test of a session can still fail the harness's own teardown check on a lingering shutdown thread; the assertions themselves run.
 
-The GitHub Tests workflow is the check that counts: ruff, both suites over one
-coverage total gated at 95%, mypy in strict mode with Home Assistant installed,
-and the validator, on every push.
+The GitHub Tests workflow is the check that counts: ruff, both suites over one coverage total gated at 95%, mypy in strict mode with Home Assistant installed, and the validator, on every push.
 
 ## Licence
 
-The project is MIT, in `LICENSE`. Most of `custom_components/sleepiq_massage/`
-is derived from Home Assistant core's `sleepiq` at tag 2026.8.2 and stays under
-Apache-2.0, whose text is in `docs/licenses/Apache-2.0.txt`. `massage.py`,
-`diagnostics.py`, `quality_scale.yaml` and `translations/` have no upstream
-counterpart and are MIT like the rest of the project; `NOTICE` carries the
-file-by-file split.
+The project is MIT, in `LICENSE`. Most of `custom_components/sleepiq_massage/` is derived from Home Assistant core's `sleepiq` at tag 2026.8.2 and stays under Apache-2.0, whose text is in `docs/licenses/Apache-2.0.txt`. `massage.py`, `diagnostics.py`, `quality_scale.yaml` and `translations/` have no upstream counterpart and are MIT like the rest of the project; `NOTICE` carries the file-by-file split.
 
 ## Upstreaming
 
-The proper fix is upstream: add a massage object to `asyncsleepiq` (read and
-write, wired into `init_features()` / `update()`), then add the entities to
-`home-assistant/core`. The derived files are already Apache-2.0, which is core's
-own licence, so they move upstream unchanged.
+The proper fix is upstream: add a massage object to `asyncsleepiq` (read and write, wired into `init_features()` / `update()`), then add the entities to `home-assistant/core`. The derived files are already Apache-2.0, which is core's own licence, so they move upstream unchanged.
 
 ## Credits
 
-`custom_components/sleepiq_massage/` is derived from the Home Assistant `sleepiq`
-integration by @mfugate1 and @kbickar. See `NOTICE`.
+`custom_components/sleepiq_massage/` is derived from the Home Assistant `sleepiq` integration by @mfugate1 and @kbickar. See `NOTICE`.
 
-The underlying API behaviour was confirmed by capturing the SleepIQ Android
-app's own traffic.
+The underlying API behaviour was confirmed by capturing the SleepIQ Android app's own traffic.
