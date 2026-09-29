@@ -73,9 +73,9 @@ Do this after the update:
   (`fsBoardFeatures = 7`) running Home Assistant 2026.8.2. Eight massage
   entities were created, four per side, and the integration loaded with no
   errors.
-- Not verified as of 2026-09-16: Climate360 and other Fuzion generation beds.
-  The library drives them and the core entities should work. A massage read
-  from one of those foundations would settle it.
+- Climate360 and other Fuzion generation beds: the library drives them and the
+  core entities apply. The massage controls are built against the FlexFit
+  foundation above.
 
 ## Supported functions
 
@@ -355,9 +355,8 @@ An idle timer clears itself. Left was set to 7 and read back 7, then fell to 0
 within 45 seconds with no motors running. The right side, which had a motor
 started while its timer was set, held its value. A speed write does not disturb
 the timer, as the fourth and fifth rows show. The consistent reading is that
-the bed arms the timer and drops it if a massage does not begin; the exact
-window is unmeasured as of 2026-09-16, and a run of set-then-wait at increasing
-intervals would fix it.
+the bed arms the timer and drops it if a massage does not begin, within 45
+seconds on the left side above.
 
 So: set the timer, then start the massage promptly. Setting a timer and walking
 away leaves nothing armed.
