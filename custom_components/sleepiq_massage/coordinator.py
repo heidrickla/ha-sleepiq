@@ -110,7 +110,9 @@ class SleepIQDataUpdateCoordinator(DataUpdateCoordinator[None]):
 
         registry = dr.async_get(self.hass)
         for bed_id in set(previous_beds) - set(self.client.beds):
-            device = registry.async_get_device(identifiers={(DOMAIN, bed_id)})
+            device = registry.async_get_device_by_identifier(
+                (DOMAIN, bed_id), self.config_entry.entry_id
+            )
             if device is not None:
                 _LOGGER.debug("Removing bed %s, no longer on the account", bed_id)
                 registry.async_remove_device(device.id)

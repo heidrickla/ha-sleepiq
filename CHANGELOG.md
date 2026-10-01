@@ -2,6 +2,12 @@
 
 Newest first, in the style of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.1] - 2026-10-01
+
+### Changed
+
+- A bed that leaves the account is found with `async_get_device_by_identifier` under its own config entry; `async_get_device` is removed in Home Assistant 2027.8.
+
 ## [0.2.0] - 2026-09-16
 
 ### Changed
