@@ -7,6 +7,7 @@ Newest first, in the style of [Keep a Changelog](https://keepachangelog.com/en/1
 ### Changed
 
 - A bed that leaves the account is found with `async_get_device_by_identifier` under its own config entry; `async_get_device` is removed in Home Assistant 2027.8.
+- The `asyncsleepiq` requirement is `>=1.7.1`: Home Assistant 2026.9 ships 1.7.1 and 2026.10 ships 1.7.2, and a pin to either one conflicts with the other.
 
 ## [0.2.0] - 2026-09-16
 
