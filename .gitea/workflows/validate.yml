@@ -16,8 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        timeout-minutes: 15
 
       - name: Install ruff
+        timeout-minutes: 15
         # Pinned deliberately. An unpinned linter makes CI non-reproducible:
         # this job passed locally and failed in CI purely because pip fetched a
         # newer ruff whose default rules differed from the local install.
@@ -27,6 +29,7 @@ jobs:
           python3 -m ruff --version
 
       - name: Ruff
+        timeout-minutes: 15
         # ruff.toml adopts Home Assistant core's isort settings, because this
         # repo vendors core's files and must not reformat them.
         run: |
@@ -34,6 +37,7 @@ jobs:
           python3 -m ruff format --check .
 
       - name: Vendored core files are unmodified
+        timeout-minutes: 15
         # The point of the baseline: an upstream resync stays a small diff only
         # while the untouched files stay byte-identical. Reformatting one - by
         # ruff --fix, an editor, or a well-meaning cleanup - silently destroys
@@ -75,6 +79,7 @@ jobs:
       # only with a pinned 3.14 toolchain.
 
       - name: JSON is valid
+        timeout-minutes: 15
         run: |
           for f in custom_components/sleepiq_massage/*.json custom_components/sleepiq_massage/translations/*.json hacs.json; do
             python3 -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "$f" || exit 1
@@ -82,6 +87,7 @@ jobs:
           echo "all JSON valid"
 
       - name: Manifest sanity
+        timeout-minutes: 15
         run: |
           python3 - <<'PY'
           import json
@@ -97,6 +103,7 @@ jobs:
           PY
 
       - name: Translations ship and agree
+        timeout-minutes: 15
         # Home Assistant reads translations/<lang>.json at runtime; strings.json
         # is only hassfest's input. Core's [%key:common::...] references resolve
         # only inside core's build and render as raw keys here.
@@ -112,6 +119,7 @@ jobs:
           PY
 
       - name: Quality scale is complete and honest
+        timeout-minutes: 15
         run: |
           python3 -m pip install --quiet "PyYAML==6.0.2"
           python3 - <<'PY'
@@ -144,4 +152,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        timeout-minutes: 15
       - uses: home-assistant/actions/hassfest@master
+        timeout-minutes: 15
