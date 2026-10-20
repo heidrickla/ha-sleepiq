@@ -11,7 +11,7 @@ on:
 jobs:
   tests:
     if: github.server_url == 'https://github.com'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       # fetch-depth 0, not the default 1. The object-database scan in
       # tools/validate_local.py reads every commit message; a depth-1 checkout
