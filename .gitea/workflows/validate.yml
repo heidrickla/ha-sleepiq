@@ -18,23 +18,30 @@ jobs:
       - uses: actions/checkout@v4
         timeout-minutes: 15
 
-      - name: Install ruff
+      - uses: actions/setup-python@v5
         timeout-minutes: 15
+        with:
+          python-version: "3.14"
+
+      - name: Install ruff and PyYAML
+        timeout-minutes: 15
+        # A venv of the job's own: the image's Python is externally managed, and
+        # the runner's toolcache Python carries other repos' packages.
         # Pinned deliberately. An unpinned linter makes CI non-reproducible:
         # this job passed locally and failed in CI purely because pip fetched a
         # newer ruff whose default rules differed from the local install.
         run: |
-          python3 -m pip install --quiet --upgrade pip
-          python3 -m pip install --quiet "ruff==0.15.21"
-          python3 -m ruff --version
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --quiet "ruff==0.15.21" "PyYAML==6.0.2"
+          "$RUNNER_TEMP/venv/bin/python" -m ruff --version
 
       - name: Ruff
         timeout-minutes: 15
         # ruff.toml adopts Home Assistant core's isort settings, because this
         # repo vendors core's files and must not reformat them.
         run: |
-          python3 -m ruff check .
-          python3 -m ruff format --check .
+          "$RUNNER_TEMP/venv/bin/python" -m ruff check .
+          "$RUNNER_TEMP/venv/bin/python" -m ruff format --check .
 
       - name: Vendored core files are unmodified
         timeout-minutes: 15
@@ -44,7 +51,7 @@ jobs:
         # that, and nothing else would notice. A line ending in `modified` in
         # the baseline is a file this project edits on purpose; NOTICE says how.
         run: |
-          python3 - <<'PY'
+          "$RUNNER_TEMP/venv/bin/python" - <<'PY'
           import hashlib, io, os, re, sys
           base, owned = {}, set()
           for line in io.open("docs/UPSTREAM-BASELINE.txt", encoding="utf-8"):
@@ -71,25 +78,18 @@ jobs:
           print(f"{len(base)-len(owned)} vendored file(s) match upstream, {len(owned)} modified on purpose")
           PY
 
-      # No separate ast.parse step. homeassistant 2026.8.3 declares
-      # Requires-Python >=3.14.2, and this tree carries 3.14 syntax that an
-      # older python3 reports as a syntax error. Ruff parses every file at
-      # target-version py314 per ruff.toml, and tools/validate_local.py has the
-      # same constraint and runs on Python 3.14 in the GitHub Tests job. Add one
-      # only with a pinned 3.14 toolchain.
-
       - name: JSON is valid
         timeout-minutes: 15
         run: |
           for f in custom_components/sleepiq_massage/*.json custom_components/sleepiq_massage/translations/*.json hacs.json; do
-            python3 -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "$f" || exit 1
+            "$RUNNER_TEMP/venv/bin/python" -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "$f" || exit 1
           done
           echo "all JSON valid"
 
       - name: Manifest sanity
         timeout-minutes: 15
         run: |
-          python3 - <<'PY'
+          "$RUNNER_TEMP/venv/bin/python" - <<'PY'
           import json
           m = json.load(open("custom_components/sleepiq_massage/manifest.json", encoding="utf-8"))
           missing = [k for k in ("domain","name","version","documentation","codeowners") if not m.get(k)]
@@ -108,7 +108,7 @@ jobs:
         # is only hassfest's input. Core's [%key:common::...] references resolve
         # only inside core's build and render as raw keys here.
         run: |
-          python3 - <<'PY'
+          "$RUNNER_TEMP/venv/bin/python" - <<'PY'
           import json
           s = json.load(open("custom_components/sleepiq_massage/strings.json", encoding="utf-8"))
           e = json.load(open("custom_components/sleepiq_massage/translations/en.json", encoding="utf-8"))
@@ -121,8 +121,7 @@ jobs:
       - name: Quality scale is complete and honest
         timeout-minutes: 15
         run: |
-          python3 -m pip install --quiet "PyYAML==6.0.2"
-          python3 - <<'PY'
+          "$RUNNER_TEMP/venv/bin/python" - <<'PY'
           import json, yaml
           rules = yaml.safe_load(open(
               "custom_components/sleepiq_massage/quality_scale.yaml", encoding="utf-8"))["rules"]
