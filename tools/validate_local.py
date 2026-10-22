@@ -829,23 +829,18 @@ def scan_controls(
 # refuses 8 that no ref reaches, and a clone of the same HEAD over the git
 # transport reads 326 and refuses none.
 #
-# Objects whose hits are the pinned address table itself, by SHA and reason.
-# A version of tools/_netblocks.py is exempt by its name in the tree instead,
-# so a later edit to that file needs no entry here. Every entry here is a
-# commit message: an exemption by SHA blinds the whole object, so a host-scoped
-# entry in REPO_ALLOWED_HOSTS is preferred wherever the hit is an address a
-# file may hold.
-SCAN_EXEMPT_OBJECTS = {
-    # commit message stating the CIDRs the tree scan pins, plus one gateway
-    # address inside one of them that the measurement it records used
-    "10e8e867df6cb1d41b76ef236a496dcaa5092afe": "development-host refusal",
-    # commit message stating the CIDRs the manifest URL rule pins
-    "e3892ca20b494039a6678e51bfe9b8c7e1330ad9": "manifest URL refusal",
-    # commit message quoting the address its own measurement was made with.
-    # Reachable from main and not from the published head, so the address is
-    # unpublished and a message rewrite has to reach it before the first push.
-    # The exemption records that rather than implying the scan found nothing.
-    "231bc1d4677d76a5585f2d033bd638a42d5818c7": "object-database scan measurement",
+# Commit messages whose hits are the pinned address table itself, by the
+# sha256 of the message (the commit object after its headers) and reason.
+# Keyed by the message, not the commit SHA: a history rewrite gives every
+# commit a new SHA and keeps its message, and SHA keys stopped matching after
+# the rewrite of 2026-10-22. A version of tools/_netblocks.py is exempt by its
+# name in the tree instead, so a later edit to that file needs no entry here.
+# An exemption blinds the whole message, so a host-scoped entry in
+# REPO_ALLOWED_HOSTS is preferred wherever the hit is an address a file may
+# hold.
+SCAN_EXEMPT_MESSAGES = {
+    # message stating the CIDRs the manifest URL rule pins
+    "6cbd840c3f5754929e297545501075446052f0a68df6cde121a18477404f4dce": "manifest URL refusal",
 }
 # A blob above this is not prose. The largest text object in this repository
 # is under 100 KiB.
@@ -967,12 +962,16 @@ def scan_object_database(name_re: Any = None) -> None:
         notes.append("git not available - the object database was not scanned")
         return
     refuse_truncated_history(records)
-    exempt = netblock_blobs(records) | set(SCAN_EXEMPT_OBJECTS)
+    exempt = netblock_blobs(records)
     seen = 0
     binary = 0
     oversized = 0
+    messages = 0
     for sha, kind, body in records:
         if kind not in ("blob", "commit") or sha in exempt:
+            continue
+        if kind == "commit" and message_digest(body) in SCAN_EXEMPT_MESSAGES:
+            messages += 1
             continue
         if len(body) > MAX_SCANNED_OBJECT:
             oversized += 1
@@ -1000,8 +999,15 @@ def scan_object_database(name_re: Any = None) -> None:
         f"non-text, {oversized} over the {MAX_SCANNED_OBJECT} byte limit"
     )
     notes.append(
-        f"{len(exempt)} objects exempt from the object scan by SHA or by file name"
+        f"{len(exempt)} blobs exempt from the object scan by file name, "
+        f"{messages} commits by their message"
     )
+
+
+def message_digest(commit: bytes) -> str:
+    """The sha256 of a commit object's message, the part after its headers."""
+    _headers, _sep, message = commit.partition(b"\n\n")
+    return hashlib.sha256(message).hexdigest()
 
 
 def refuse_unpublished_paths() -> None:

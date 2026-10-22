@@ -2,6 +2,12 @@
 
 Newest first, in the style of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- The validator's object scan exempts a commit message by the sha256 of the message instead of the commit's SHA, so a rewritten history keeps the exemption.
+
 ## [0.2.2] - 2026-10-22
 
 ### Changed
