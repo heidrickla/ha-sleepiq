@@ -8,6 +8,7 @@ Newest first, in the style of [Keep a Changelog](https://keepachangelog.com/en/1
 
 - A SleepIQ API error is reported by its HTTP status code, and a login or timeout error by the first line of its message, in setup, polling and write errors and in the log. The library's exception is not chained onto the error Home Assistant logs.
 - The GitHub workflows pin every action to a commit and grant the job token no permissions.
+- `.gitignore` lists `CONTRIBUTING.md`.
 
 ## [0.2.1] - 2026-10-01
 
