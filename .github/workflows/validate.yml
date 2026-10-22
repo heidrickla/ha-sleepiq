@@ -7,6 +7,9 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch:
 
+# Nothing here writes to the repo, publishes, or comments on a PR.
+permissions: {}
+
 # Every job here is gated to GitHub. A mirror that reads .github/workflows as
 # well skips them and runs .gitea/workflows/validate.yml instead.
 
@@ -16,16 +19,16 @@ jobs:
     name: hassfest
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: home-assistant/actions/hassfest@master
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: home-assistant/actions/hassfest@cd6f3635a740c84d8a14f6121a90068b8ece6bf6 # master
 
   hacs:
     if: github.server_url == 'https://github.com'
     name: HACS
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: hacs/action@main
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa # main
         with:
           category: integration
           # No `ignore:` key on purpose. The hacs/default pull-request template
