@@ -32,6 +32,25 @@ SLEEP_DATA_UPDATE_INTERVAL = timedelta(hours=1)  # Sleep data doesn't change fre
 
 type SleepIQConfigEntry = ConfigEntry[SleepIQData]
 
+# Longest first line of a library message carried into an error.
+_ERROR_TEXT_LIMIT = 120
+
+
+def library_error_text(err: Exception) -> str:
+    """What a library failure may say in a log or the UI.
+
+    asyncsleepiq appends the response object to its messages after a newline,
+    and that object prints the request URL with the session key and the
+    response headers. An API error is reported by its status code; any other
+    error by the first line of its message. Callers raise their own error
+    `from None`, because Home Assistant logs a chained cause with its message.
+    """
+    if isinstance(err, SleepIQAPIException):
+        code = getattr(err, "code", None)
+        return f"HTTP {code}" if isinstance(code, int) else "API error"
+    first = str(err).split("\n", 1)[0].strip()
+    return first[:_ERROR_TEXT_LIMIT] or type(err).__name__
+
 
 async def _gather(tasks: list[Coroutine[Any, Any, None]]) -> None:
     """Run the fetches together and turn library failures into coordinator ones.
@@ -45,17 +64,17 @@ async def _gather(tasks: list[Coroutine[Any, Any, None]]) -> None:
     except SleepIQLoginException as err:
         raise ConfigEntryAuthFailed(
             translation_domain=DOMAIN, translation_key="invalid_auth"
-        ) from err
+        ) from None
     except SleepIQTimeoutException as err:
         raise UpdateFailed(
             translation_domain=DOMAIN, translation_key="update_timeout"
-        ) from err
+        ) from None
     except SleepIQAPIException as err:
         raise UpdateFailed(
             translation_domain=DOMAIN,
             translation_key="update_failed",
-            translation_placeholders={"error": str(err)},
-        ) from err
+            translation_placeholders={"error": library_error_text(err)},
+        ) from None
 
 
 class SleepIQDataUpdateCoordinator(DataUpdateCoordinator[None]):

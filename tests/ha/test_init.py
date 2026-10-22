@@ -27,6 +27,7 @@ from homeassistant.helpers import (
 )
 from homeassistant.setup import async_setup_component
 from homeassistant.util.dt import utcnow
+import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
@@ -55,8 +56,11 @@ from .conftest import (
     SLEEPER_L_NAME,
     SLEEPER_L_NAME_LOWER,
     SLEEPER_R_ID,
+    COOKIE,
+    SESSION_KEY,
     SLEEPIQ_CONFIG,
     make_bed,
+    response_shaped_text,
     massage_reads,
     setup_platform,
 )
@@ -495,3 +499,40 @@ async def test_comfort_select_unique_ids_move_from_the_sleeper_to_the_side(
     # The migrated entities are the live ones, not orphans beside new copies.
     assert hass.states.get("select.old_warmer").state == "off"
     assert hass.states.get("select.old_climate").state == "off"
+
+
+async def test_a_setup_error_never_carries_the_response_text(
+    hass: HomeAssistant, mock_asyncsleepiq, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The retry reason names the status code, not the session key."""
+    mock_asyncsleepiq.init_beds.side_effect = SleepIQAPIException(
+        503, response_shaped_text(503)
+    )
+    entry = await setup_platform(hass)
+    assert not await hass.config_entries.async_setup(entry.entry_id)
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    assert "HTTP 503" in caplog.text
+    for secret in (SESSION_KEY, COOKIE):
+        assert secret not in caplog.text
+        assert secret not in str(entry.reason)
+
+
+async def test_a_polling_error_never_carries_the_response_text(
+    hass: HomeAssistant, mock_asyncsleepiq, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A failed poll is logged and shown by its status code only."""
+    entry = await setup_platform(hass, ["select"])
+
+    mock_asyncsleepiq.get.side_effect = SleepIQAPIException(
+        503, response_shaped_text(503)
+    )
+    async_fire_time_changed(hass, utcnow() + UPDATE_INTERVAL)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert hass.states.get(MODE_L).state == STATE_UNAVAILABLE
+    failure = entry.runtime_data.data_coordinator.last_exception
+    assert failure is not None
+    assert failure.translation_placeholders == {"error": "HTTP 503"}
+    for secret in (SESSION_KEY, COOKIE):
+        assert secret not in caplog.text
+        assert secret not in str(failure)

@@ -26,6 +26,7 @@ from .coordinator import (
     SleepIQDataUpdateCoordinator,
     SleepIQPauseUpdateCoordinator,
     SleepIQSleepDataCoordinator,
+    library_error_text,
 )
 from .massage import side_label
 
@@ -81,8 +82,8 @@ async def async_write_to_bed(
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key=translation_key,
-            translation_placeholders={"error": str(err)},
-        ) from err
+            translation_placeholders={"error": library_error_text(err)},
+        ) from None
 
 
 @callback

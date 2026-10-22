@@ -1,6 +1,6 @@
 """The buttons: names, category, and what a refused press says."""
 
-from asyncsleepiq.exceptions import SleepIQAPIException
+from asyncsleepiq.exceptions import SleepIQAPIException, SleepIQLoginException
 from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, SERVICE_PRESS
 from homeassistant.const import ATTR_ENTITY_ID, ATTR_FRIENDLY_NAME, EntityCategory
 from homeassistant.core import HomeAssistant
@@ -8,7 +8,15 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 import pytest
 
-from .conftest import BED_ID, BED_NAME, BED_NAME_LOWER, setup_platform
+from .conftest import (
+    BED_ID,
+    BED_NAME,
+    BED_NAME_LOWER,
+    COOKIE,
+    SESSION_KEY,
+    response_shaped_text,
+    setup_platform,
+)
 
 CALIBRATE = f"button.{BED_NAME_LOWER}_calibrate"
 STOP_PUMP = f"button.{BED_NAME_LOWER}_stop_pump"
@@ -63,4 +71,37 @@ async def test_a_refused_press_is_a_translated_error(
         await _press(hass, CALIBRATE)
 
     assert err.value.translation_key == "write_failed"
-    assert err.value.translation_placeholders == {"error": "nope"}
+    assert err.value.translation_placeholders == {"error": "HTTP 500"}
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (SleepIQAPIException(503, response_shaped_text(503)), "HTTP 503"),
+        (
+            SleepIQLoginException(
+                "Unexpected response code: 503\n" + response_shaped_text(503)
+            ),
+            "Unexpected response code: 503",
+        ),
+    ],
+)
+async def test_a_refusal_never_carries_the_response_text(
+    hass: HomeAssistant,
+    mock_asyncsleepiq,
+    mock_bed,
+    caplog: pytest.LogCaptureFixture,
+    error: Exception,
+    expected: str,
+) -> None:
+    """The library's message holds the session key and the response headers."""
+    await setup_platform(hass, [BUTTON_DOMAIN])
+    mock_bed.calibrate.side_effect = error
+
+    with pytest.raises(HomeAssistantError) as err:
+        await _press(hass, CALIBRATE)
+
+    assert err.value.translation_placeholders == {"error": expected}
+    for secret in (SESSION_KEY, COOKIE):
+        assert secret not in str(err.value)
+        assert secret not in caplog.text

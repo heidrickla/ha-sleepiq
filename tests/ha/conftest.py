@@ -290,3 +290,20 @@ async def setup_platform(
         await hass.async_block_till_done()
 
     return mock_entry
+
+
+# What asyncsleepiq puts in an error: its message, a newline, then the
+# response object, whose repr prints the URL with the session key and the
+# response headers.
+SESSION_KEY = "test-session-key-0123"
+COOKIE = "test-cookie-0123"
+
+
+def response_shaped_text(status: int) -> str:
+    """The text asyncsleepiq builds for a failed call."""
+    return (
+        f"API call error response {status}\n"
+        "<ClientResponse(https://prod-api.sleepiq.sleepnumber.com/rest/bed"
+        f"?_k={SESSION_KEY}) [{status} Service Unavailable]>\n"
+        f"<CIMultiDictProxy('Set-Cookie': 'AWSALB={COOKIE}')>"
+    )

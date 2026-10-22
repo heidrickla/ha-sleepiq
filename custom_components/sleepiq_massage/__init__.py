@@ -42,6 +42,7 @@ from .coordinator import (
     SleepIQDataUpdateCoordinator,
     SleepIQPauseUpdateCoordinator,
     SleepIQSleepDataCoordinator,
+    library_error_text,
 )
 from .massage import build_massage_sides
 
@@ -108,24 +109,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: SleepIQConfigEntry) -> b
         _LOGGER.error("Could not authenticate with SleepIQ server")
         raise ConfigEntryAuthFailed(
             translation_domain=DOMAIN, translation_key="invalid_auth"
-        ) from err
+        ) from None
     except SleepIQTimeoutException as err:
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN, translation_key="login_timeout"
-        ) from err
+        ) from None
 
     try:
         await gateway.init_beds()
     except SleepIQTimeoutException as err:
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN, translation_key="init_timeout"
-        ) from err
+        ) from None
     except SleepIQAPIException as err:
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN,
             translation_key="init_failed",
-            translation_placeholders={"error": str(err)},
-        ) from err
+            translation_placeholders={"error": library_error_text(err)},
+        ) from None
 
     # asyncsleepiq has no massage object, so build ours per bed before any
     # coordinator refresh runs. Beds without the massage board get an empty

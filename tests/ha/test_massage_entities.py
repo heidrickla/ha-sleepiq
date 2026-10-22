@@ -201,7 +201,7 @@ async def test_a_refused_write_is_a_translated_error_and_changes_nothing(
     with pytest.raises(HomeAssistantError) as err:
         await _select(hass, MODE_L, "wave")
     assert err.value.translation_key == "massage_write_failed"
-    assert err.value.translation_placeholders == {"error": "nope"}
+    assert err.value.translation_placeholders == {"error": "HTTP 500"}
     assert hass.states.get(MODE_L).state == "off"
 
     with pytest.raises(HomeAssistantError) as err:

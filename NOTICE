@@ -51,7 +51,8 @@ mypy in strict mode does not accept either library's implicit re-exports.
   * coordinator.py   - fetch massage state on each refresh, translated poll
                        exceptions, login failure raised as ConfigEntryAuthFailed,
                        the account's bed list followed as beds are added and
-                       removed
+                       removed, library errors reported by status code or the
+                       first line of their message
   * entity.py        - has_entity_name on the base classes, the bed id as a
                        device identifier, the shared write helper, the helper
                        that adds a later bed's entities; core's sleeper_for_side
