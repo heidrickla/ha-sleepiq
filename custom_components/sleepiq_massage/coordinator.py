@@ -61,11 +61,11 @@ async def _gather(tasks: list[Coroutine[Any, Any, None]]) -> None:
     """
     try:
         await asyncio.gather(*tasks)
-    except SleepIQLoginException as err:
+    except SleepIQLoginException:
         raise ConfigEntryAuthFailed(
             translation_domain=DOMAIN, translation_key="invalid_auth"
         ) from None
-    except SleepIQTimeoutException as err:
+    except SleepIQTimeoutException:
         raise UpdateFailed(
             translation_domain=DOMAIN, translation_key="update_timeout"
         ) from None

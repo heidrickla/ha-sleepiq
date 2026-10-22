@@ -105,19 +105,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: SleepIQConfigEntry) -> b
 
     try:
         await gateway.login(email, password)
-    except SleepIQLoginException as err:
+    except SleepIQLoginException:
         _LOGGER.error("Could not authenticate with SleepIQ server")
         raise ConfigEntryAuthFailed(
             translation_domain=DOMAIN, translation_key="invalid_auth"
         ) from None
-    except SleepIQTimeoutException as err:
+    except SleepIQTimeoutException:
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN, translation_key="login_timeout"
         ) from None
 
     try:
         await gateway.init_beds()
-    except SleepIQTimeoutException as err:
+    except SleepIQTimeoutException:
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN, translation_key="init_timeout"
         ) from None
