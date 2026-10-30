@@ -2,7 +2,15 @@
 
 Newest first, in the style of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.2.3] - 2026-10-30
+
+### Changed
+
+- When Home Assistant's built-in SleepIQ is already signed in to the same account, the setup says so after sign-in: both integrations create entities for each bed, and it names where to delete the built-in entry to keep one set. Submit adds the entry. The README no longer has to be read before setting up.
+- The component ships `translations/en.json` only. `strings.json` is core's build input, and the HACS Marketplace validates `en.json`; the validator and the forge lint job refuse a `strings.json`.
+- `hacs.json` carries only the keys the HACS Marketplace reads; `render_readme` is dropped.
+- The README's Installation starts with My Home Assistant buttons that open the repository in HACS and start the setup, says the integration is a HACS custom repository, and lists the setup screens as they are. The steps for upgrading from 0.1.0 are in the 0.2.0 entry below.
+- `translations/en.json` is listed in `NOTICE` and the README's licence section as core's `strings.json` moved, under Apache-2.0, instead of as an MIT addition.
 
 ### Fixed
 
@@ -27,7 +35,7 @@ Newest first, in the style of [Keep a Changelog](https://keepachangelog.com/en/1
 
 ### Changed
 
-- Breaking: the domain is now `sleepiq_massage`. 0.1.0 used `sleepiq`, a core integration's domain, and a custom component under a core domain shadows the built-in one entirely: Home Assistant loads `custom_components/sleepiq` in preference to core's `sleepiq`. HACS installs this version into `config/custom_components/sleepiq_massage` and leaves `config/custom_components/sleepiq` on disk, where the 0.1.0 code keeps shadowing core's built-in `sleepiq` and never updates again. Delete that directory, restart, add SleepIQ (with massage) from Add integration, then delete the old entry if you want one set of entities; README has the sequence. There is no migration: unique ids under the new domain do not collide with core's, so both integrations can run side by side on the same account, with the second set's entity ids carrying a `_2` suffix. The deprecated YAML key moves with the domain, to `sleepiq_massage:`.
+- Breaking: the domain is now `sleepiq_massage`. 0.1.0 used `sleepiq`, a core integration's domain, and a custom component under a core domain shadows the built-in one entirely: Home Assistant loads `custom_components/sleepiq` in preference to core's `sleepiq`. HACS installs this version into `config/custom_components/sleepiq_massage` and leaves `config/custom_components/sleepiq` on disk, where the 0.1.0 code keeps shadowing core's built-in `sleepiq` and never updates again. After the update: (1) delete `config/custom_components/sleepiq`; (2) restart Home Assistant, and core's built-in `sleepiq` takes over the 0.1.0 config entry while the massage entities disappear with the 0.1.0 code; (3) add SleepIQ (with massage) from Add integration; (4) delete the old entry if you want one set of entities. HACS leaves the old directory because it removes a directory only on uninstall, never on an update, and derives the install path from the manifest domain of the version it downloads. There is no migration: unique ids under the new domain do not collide with core's, so both integrations can run side by side on the same account, with the second set's entity ids carrying a `_2` suffix. The deprecated YAML key moves with the domain, to `sleepiq_massage:`.
 - The project licence is MIT, in `LICENSE`. The files in `custom_components/sleepiq_massage/` derived from Home Assistant core remain Apache-2.0; `docs/licenses/Apache-2.0.txt` carries that text and `NOTICE` has the file-by-file split, including the four added files, which are MIT. The Apache text is not a second root `LICENSE-*` file because GitHub reports NOASSERTION for a root with two licence-named files and HACS fails on that.
 - `hacs.json` sets no `country`. The key filters the HACS store listing to the countries it names and hides the repository from every viewer whose HACS country is set to something else. The SleepIQ cloud is one global endpoint with no regional variant, and neither this integration nor `asyncsleepiq` reads a country, so a bed works wherever it is. Sleep Number's retail footprint is a purchase constraint, not an operating one, and Sleep Country Canada completed its acquisition of the business on 2026-07-31 with a Canadian and UK rollout announced in principle, so a `["US"]` value would have hidden the listing from those owners.
 - A second discovered bed, or the same bed on a new DHCP lease, no longer raises a second card. `async_step_dhcp` defers to `ConfigFlow`'s `_async_handle_discovery_without_unique_id`, which adds an `already_in_progress` abort to the `already_configured` one. Core's `sleepiq` claims the same `64DBA0*` prefix and Home Assistant appends a custom integration's matchers to core's list, so a user who has not set core up still sees core's card beside this one; that card is core's and is not this integration's to suppress.

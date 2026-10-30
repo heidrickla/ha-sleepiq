@@ -40,7 +40,8 @@ rules:
     comment: |
       tests/ha/test_config_flow.py covers every step: the user step, both
       error mappings each followed by a retry that reaches CREATE_ENTRY, the
-      duplicate abort, the YAML import in both outcomes, DHCP discovery in
+      duplicate abort, the step shown when core's sleepiq already has the
+      account, the YAML import in both outcomes, DHCP discovery in
       both outcomes, reconfigure with and without a new password including the
       wrong-account abort and an error followed by recovery, and reauth in
       both outcomes. Every form that can show an error is checked not to echo
@@ -97,7 +98,7 @@ rules:
     status: done
     comment: |
       Every entity on every platform sets _attr_has_entity_name and takes its
-      name from strings.json; no _attr_name is left anywhere in the component,
+      name from translations/en.json; no _attr_name is left anywhere in the component,
       which tools/validate_local.py enforces. Names read as "<bed> <sleeper>
       firmness" rather than repeating "SleepNumber <bed>" in every entity.
   runtime-data: done
@@ -260,7 +261,7 @@ rules:
   entity-translations:
     status: done
     comment: |
-      Every entity has a translated name in strings.json, with the sleeper or
+      Every entity has a translated name in translations/en.json, with the sleeper or
       the side as a placeholder where a bed has two of a thing, and one key
       per side and end for the actuators so no name is assembled from English
       words. tools/validate_local.py fails a translation key with no name and

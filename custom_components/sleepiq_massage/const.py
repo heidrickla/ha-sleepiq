@@ -6,7 +6,7 @@ DOMAIN = "sleepiq_massage"
 # Must match manifest.json. HACS surfaces the release tag while Home Assistant
 # reports the manifest version, so a mismatch is a wrong version number on
 # screen. tools/validate_local.py refuses one.
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 
 ACTUATOR = "actuator"
 CORE_CLIMATE_TIMER = "core_climate_timer"
@@ -32,7 +32,7 @@ MASSAGE_HEAD_SPEED = "massage_head_speed"
 MASSAGE_TIMER = "massage_timer"
 
 # Translation keys for the entities whose name is not built from the type
-# constant above. Every entity name comes from strings.json.
+# constant above. Every entity name comes from translations/en.json.
 LIGHT = "light"
 PAUSE_MODE = "pause_mode"
 PRESET = "preset"

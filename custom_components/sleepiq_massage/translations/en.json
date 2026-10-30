@@ -14,6 +14,10 @@
       "invalid_auth": "Invalid authentication"
     },
     "step": {
+      "core_found": {
+        "description": "Home Assistant's built-in SleepIQ integration is already signed in to {username}. Both create a device and entities for each bed, and the second set's entity ids end in _2. To keep only this one, delete the built-in entry afterwards: Settings, Devices & services, SleepIQ, the three dots, Delete. Its entities and their history go with it. Submit to add SleepIQ (with massage).",
+        "title": "The built-in SleepIQ has this account"
+      },
       "reauth_confirm": {
         "data": {
           "password": "Password"

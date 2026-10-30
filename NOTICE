@@ -9,7 +9,7 @@ Version 2.0. docs/licenses/Apache-2.0.txt carries that text; it is not at the
 repository root because GitHub's licence detection reports NOASSERTION when two
 licence-named files sit there, which fails the HACS licence check. The files
 listed below as derived from core remain under Apache-2.0 and keep its
-obligations, including this notice. Every other file, including the four added
+obligations, including this notice. Every other file, including the three added
 files listed below, is MIT.
 
 The contents of custom_components/sleepiq_massage/ are derived from
@@ -22,10 +22,9 @@ Files added by this project, with no upstream counterpart:
   * massage.py         - massage state model and control
   * diagnostics.py     - diagnostics download
   * quality_scale.yaml - Integration Quality Scale record
-  * translations/      - runtime translations (a copy of strings.json)
 
 Modifications by this project, relative to that baseline. Three of them run
-through every platform: entity names come from strings.json through a
+through every platform: entity names come from translations/en.json through a
 translation key instead of a hard-coded English string, icons come from
 icons.json instead of _attr_icon, and every write to the bed raises a
 translated HomeAssistantError instead of letting the library's exception
@@ -42,7 +41,8 @@ mypy in strict mode does not accept either library's implicit re-exports.
                        translated write failures, calibration filed as a
                        configuration entity
   * config_flow.py   - masked password selector on every form, a DHCP
-                       discovery step, a reconfigure flow
+                       discovery step, a reconfigure flow, a step that says so
+                       when core's sleepiq already has the account
   * const.py         - massage entity type constants, translation keys, the
                        repair issue key, the version constant the local
                        validator cross-checks against manifest.json; core's
@@ -71,10 +71,14 @@ mypy in strict mode does not accept either library's implicit re-exports.
   * sensor.py        - translated names per sleeper, icons.json
   * switch.py        - translated name, icons.json, PARALLEL_UPDATES,
                        translated write failures
-  * strings.json     - a name for every entity, massage translations, field
-                       descriptions, exception messages, the repair issue;
-                       core-only [%key:...] references replaced with literals,
-                       which do not resolve outside core
+  * translations/en.json
+                     - core's strings.json, moved to the one translation file a
+                       custom integration ships: a name for every entity,
+                       massage translations, field descriptions, exception
+                       messages, the repair issue, the step shown when core's
+                       sleepiq already has the account; core-only [%key:...]
+                       references replaced with literals, which do not resolve
+                       outside core
   * icons.json       - an icon for every entity that needs one beyond its
                        device class
   * manifest.json    - custom component identity and version

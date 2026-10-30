@@ -47,14 +47,17 @@ def _password_is_masked_and_not_echoed(result) -> None:
     assert validator.config["type"] == "password"
 
 
+COMPONENT = Path(__file__).parents[2] / "custom_components" / "sleepiq_massage"
+
+
+def _translations() -> dict:
+    """translations/en.json, the only translation file the component ships."""
+    return json.loads((COMPONENT / "translations" / "en.json").read_text("utf-8"))
+
+
 def _declared_abort_reasons() -> set[str]:
-    """Abort reasons declared in both strings.json and translations/en.json."""
-    component = Path(__file__).parents[2] / "custom_components" / "sleepiq_massage"
-    declared = [
-        set(json.loads(path.read_text(encoding="utf-8"))["config"]["abort"])
-        for path in (component / "strings.json", component / "translations" / "en.json")
-    ]
-    return declared[0] & declared[1]
+    """Abort reasons declared in translations/en.json."""
+    return set(_translations()["config"]["abort"])
 
 
 # ------------------------------------------------------------------- import
@@ -300,6 +303,96 @@ async def test_the_same_account_is_not_added_twice(hass: HomeAssistant) -> None:
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
+
+
+# --------------------------------------------------------- core's sleepiq
+
+
+@pytest.mark.parametrize(
+    "source", [config_entries.SOURCE_USER, config_entries.SOURCE_DHCP]
+)
+@pytest.mark.parametrize(
+    ("unique_id", "username"),
+    [
+        (SLEEPIQ_CONFIG[CONF_USERNAME].lower(), SLEEPIQ_CONFIG[CONF_USERNAME]),
+        (None, "User@Email.com"),
+    ],
+)
+async def test_a_core_entry_for_the_account_is_explained_before_adding(
+    hass: HomeAssistant,
+    mock_setup_entry: AsyncMock,
+    source: str,
+    unique_id: str | None,
+    username: str,
+) -> None:
+    """Core already signed in to the account: a step says so, Submit adds it."""
+    MockConfigEntry(
+        domain="sleepiq",
+        data={**SLEEPIQ_CONFIG, CONF_USERNAME: username},
+        unique_id=unique_id,
+    ).add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": source},
+        data=DHCP_DISCOVERY if source == config_entries.SOURCE_DHCP else None,
+    )
+    assert result["step_id"] == "user"
+
+    with patch("asyncsleepiq.AsyncSleepIQ.login", return_value=True):
+        step = await hass.config_entries.flow.async_configure(
+            result["flow_id"], SLEEPIQ_CONFIG
+        )
+
+    assert step["type"] is FlowResultType.FORM
+    assert step["step_id"] == "core_found"
+    assert step["data_schema"].schema == {}
+    assert step["last_step"] is True
+    assert step["description_placeholders"] == {
+        CONF_USERNAME: SLEEPIQ_CONFIG[CONF_USERNAME]
+    }
+    description = _translations()["config"]["step"]["core_found"]["description"]
+    assert "{username}" in description
+    assert len(mock_setup_entry.mock_calls) == 0
+
+    done = await hass.config_entries.flow.async_configure(step["flow_id"], {})
+    await hass.async_block_till_done()
+
+    assert done["type"] is FlowResultType.CREATE_ENTRY
+    assert done["data"] == SLEEPIQ_CONFIG
+    assert done["result"].unique_id == SLEEPIQ_CONFIG[CONF_USERNAME].lower()
+    assert len(mock_setup_entry.mock_calls) == 1
+
+
+@pytest.mark.parametrize(
+    "core_entry",
+    [
+        {
+            "data": {CONF_USERNAME: "someone@else.com", CONF_PASSWORD: "theirs"},
+            "unique_id": "someone@else.com",
+        },
+        {
+            "data": {},
+            "unique_id": SLEEPIQ_CONFIG[CONF_USERNAME].lower(),
+            "source": config_entries.SOURCE_IGNORE,
+        },
+    ],
+    ids=["another_account", "ignored"],
+)
+async def test_a_core_entry_for_another_account_adds_directly(
+    hass: HomeAssistant, mock_setup_entry: AsyncMock, core_entry: dict
+) -> None:
+    """Core on a different account, or an ignored core card, needs no step."""
+    MockConfigEntry(domain="sleepiq", **core_entry).add_to_hass(hass)
+
+    with patch("asyncsleepiq.AsyncSleepIQ.login", return_value=True):
+        done = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}, data=SLEEPIQ_CONFIG
+        )
+        await hass.async_block_till_done()
+
+    assert done["type"] is FlowResultType.CREATE_ENTRY
+    assert len(mock_setup_entry.mock_calls) == 1
 
 
 # -------------------------------------------------------------- reconfigure

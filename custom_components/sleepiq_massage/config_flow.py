@@ -8,7 +8,7 @@ from asyncsleepiq.asyncsleepiq import AsyncSleepIQ
 from asyncsleepiq.exceptions import SleepIQLoginException, SleepIQTimeoutException
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import SOURCE_IGNORE, ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -23,6 +23,9 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
+# Home Assistant's built-in SleepIQ, which signs in to the same accounts.
+CORE_DOMAIN = "sleepiq"
+
 # A password field the frontend masks, with no default and no suggested value,
 # so a rejected attempt never echoes what was typed back into the form.
 PASSWORD_SELECTOR = TextSelector(
@@ -34,6 +37,8 @@ class SleepIQFlowHandler(ConfigFlow, domain=DOMAIN):
     """Handle a SleepIQ config flow."""
 
     VERSION = 1
+
+    _account: dict[str, Any]
 
     async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
         """Import a SleepIQ account as a config entry.
@@ -68,8 +73,9 @@ class SleepIQFlowHandler(ConfigFlow, domain=DOMAIN):
         Core's sleepiq declares the same 64DBA0* prefix and
         loader.async_get_dhcp appends custom matchers to core's list, so one
         bed starts a flow for each domain. Core's card disappears only when
-        core has its own entry; this flow cannot see core's entries, because
-        _async_current_entries is scoped to this handler.
+        core has its own entry. The guard above is scoped to this handler, so
+        core's entry does not hide this card; the sign-in step reads core's
+        entries itself and says so before adding a second set of entities.
         """
         _LOGGER.debug(
             "SleepNumber bed discovered at %s (%s)",
@@ -94,6 +100,9 @@ class SleepIQFlowHandler(ConfigFlow, domain=DOMAIN):
 
             if error := await try_connection(self.hass, user_input):
                 errors["base"] = error
+            elif self._core_has_account(user_input[CONF_USERNAME]):
+                self._account = user_input
+                return await self.async_step_core_found()
             else:
                 return self.async_create_entry(
                     title=user_input[CONF_USERNAME], data=user_input
@@ -114,7 +123,37 @@ class SleepIQFlowHandler(ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
+        )
+
+    async def async_step_core_found(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Say that core's SleepIQ already has this account, then add it on Submit.
+
+        Both integrations create a device and entities per bed, so the user
+        learns here, not from the README, that a second set is coming and how
+        to keep one.
+        """
+        if user_input is not None:
+            return self.async_create_entry(
+                title=self._account[CONF_USERNAME], data=self._account
+            )
+
+        return self.async_show_form(
+            step_id="core_found",
+            data_schema=vol.Schema({}),
+            description_placeholders={CONF_USERNAME: self._account[CONF_USERNAME]},
             last_step=True,
+        )
+
+    def _core_has_account(self, username: str) -> bool:
+        """Whether core's sleepiq has an entry signed in to the same account."""
+        account = username.lower()
+        return any(
+            entry.unique_id == account
+            or str(entry.data.get(CONF_USERNAME, "")).lower() == account
+            for entry in self.hass.config_entries.async_entries(CORE_DOMAIN)
+            if entry.source != SOURCE_IGNORE
         )
 
     async def async_step_reconfigure(

@@ -102,19 +102,19 @@ jobs:
           print("manifest ok:", m["domain"], m["version"])
           PY
 
-      - name: Translations ship and agree
+      - name: Translations ship alone
         timeout-minutes: 15
-        # Home Assistant reads translations/<lang>.json at runtime; strings.json
-        # is only hassfest's input. Core's [%key:common::...] references resolve
-        # only inside core's build and render as raw keys here.
+        # A custom integration ships translations/en.json, which hassfest and
+        # the HACS Marketplace validate; strings.json is core's build input.
+        # Core's [%key:common::...] references resolve only inside core's build
+        # and render as raw keys here.
         run: |
           "$RUNNER_TEMP/venv/bin/python" - <<'PY'
-          import json
-          s = json.load(open("custom_components/sleepiq_massage/strings.json", encoding="utf-8"))
-          e = json.load(open("custom_components/sleepiq_massage/translations/en.json", encoding="utf-8"))
-          assert s == e, "strings.json and translations/en.json differ - copy strings.json over"
-          for name in ("strings.json", "translations/en.json"):
-              assert "%key:" not in open(f"custom_components/sleepiq_massage/{name}", encoding="utf-8").read(), f"{name}: core-only [%key:...] reference"
+          import json, os
+          assert not os.path.exists("custom_components/sleepiq_massage/strings.json"), "strings.json is shipped - ship translations/en.json only"
+          path = "custom_components/sleepiq_massage/translations/en.json"
+          json.load(open(path, encoding="utf-8"))
+          assert "%key:" not in open(path, encoding="utf-8").read(), "translations/en.json: core-only [%key:...] reference"
           print("translations ok")
           PY
 

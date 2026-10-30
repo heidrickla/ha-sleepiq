@@ -1076,7 +1076,7 @@ def scan_published_tree(name_re: Any = None, phrases: tuple[str, ...] = ()) -> N
 def main() -> int:
     manifest = read_json(COMP, "manifest.json")
     const_src = read(COMP, "const.py")
-    strings = read_json(COMP, "strings.json")
+    strings = read_json(COMP, "translations", "en.json")
 
     # ---------------------------------------------------------- manifest
     for key in REQUIRED_MANIFEST:
@@ -1165,19 +1165,18 @@ def main() -> int:
         check(name in notice, f"{name}: modified but NOTICE does not describe how")
 
     # ---------------------------------------------------------- translations
-    # Home Assistant reads translations/<lang>.json at runtime; strings.json is
-    # only hassfest's input. Both must exist and agree, and neither may carry
-    # core's [%key:...] references, which resolve only inside core's build.
-    en = read_json(COMP, "translations", "en.json")
+    # A custom integration ships translations/en.json, which hassfest and the
+    # HACS Marketplace validate and Home Assistant reads at runtime. A
+    # strings.json is core's build input only, and core's [%key:...]
+    # references resolve only inside that build, so neither may appear here.
     check(
-        strings == en,
-        "strings.json and translations/en.json differ - copy strings.json over",
+        not os.path.exists(os.path.join(COMP, "strings.json")),
+        "strings.json is shipped - a custom integration ships translations/en.json only",
     )
-    for name in ("strings.json", os.path.join("translations", "en.json")):
-        check(
-            "%key:" not in read(COMP, name),
-            f"{name}: core-only [%key:...] reference - replace with a literal",
-        )
+    check(
+        "%key:" not in read(COMP, "translations", "en.json"),
+        "translations/en.json: core-only [%key:...] reference - replace with a literal",
+    )
     for f in sorted(os.listdir(os.path.join(COMP, "translations"))):
         check(f.endswith(".json"), f"translations/{f} is not a JSON file")
 
@@ -1229,7 +1228,7 @@ def main() -> int:
             )
 
     # ------------------------------------------ entity and icon translations
-    # Every entity in this integration is named from strings.json through a
+    # Every entity in this integration is named from translations/en.json through a
     # translation key, so: no key may be declared that no platform mentions,
     # and every key a platform mentions must have a name. Keys reach a platform
     # three ways - a literal, a constant imported from const.py, and a lookup
@@ -1255,14 +1254,14 @@ def main() -> int:
         )
         check(
             named <= used,
-            f"{platform}: strings.json has unused keys {sorted(named - used)}",
+            f"{platform}: translations/en.json has unused keys {sorted(named - used)}",
         )
         for key in sorted(declared_icons | named):
             check(
                 bool(
                     strings.get("entity", {}).get(platform, {}).get(key, {}).get("name")
                 ),
-                f"{platform}: {key} has no translated name in strings.json",
+                f"{platform}: {key} has no translated name in translations/en.json",
             )
 
     # ------------------------------------------------- exception translations
@@ -1293,7 +1292,7 @@ def main() -> int:
     # appears nowhere in the component at all.
     check(
         declared_exc <= literals,
-        f"strings.json declares unused exceptions {sorted(declared_exc - literals)}",
+        f"translations/en.json declares unused exceptions {sorted(declared_exc - literals)}",
     )
 
     # ----------------------------------------------------- issue translations
@@ -1301,7 +1300,7 @@ def main() -> int:
     declared_issues = set(strings.get("issues", {}))
     check(
         issue_consts == declared_issues,
-        f"const.py issues {sorted(issue_consts)} != strings.json issues "
+        f"const.py issues {sorted(issue_consts)} != translations/en.json issues "
         f"{sorted(declared_issues)}",
     )
 
@@ -1327,7 +1326,7 @@ def main() -> int:
         if not f.endswith(".py"):
             continue
         source = read(COMP, f)
-        check("_attr_name" not in source, f"{f}: sets _attr_name; name it in strings")
+        check("_attr_name" not in source, f"{f}: sets _attr_name; name it in en.json")
         check("_attr_icon" not in source, f"{f}: sets _attr_icon; put it in icons.json")
     check(
         "_attr_has_entity_name = True" in read(COMP, "entity.py"),

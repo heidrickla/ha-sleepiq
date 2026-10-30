@@ -21,21 +21,10 @@ There is no migration from core. Both integrations sign in to the same account a
 | Core `sleepiq` is already set up | Nothing. Its config entry, entities and history stay under domain `sleepiq`. |
 | Both are set up | Two sets of entities for the same bed. The second set's entity ids get a `_2` suffix, because the names collide. |
 | You want one set | Delete core's config entry: Settings > Devices & services > SleepIQ > three dots > Delete. Its entities and their history go with it. |
-| Upgrading from 0.1.0 of this repo | The 0.1.0 directory is left on disk and keeps shadowing core's `sleepiq`. Delete it, as below. |
+| You add this one while core is signed in to the same account | After sign-in the setup says so and names where to delete core's entry. Submit adds this one. |
 | A bed is discovered by DHCP | One card if core `sleepiq` is set up, because core's card only appears while core has no entry. Two otherwise, one per integration: take SleepIQ (with massage). Core's matcher is in Home Assistant itself; dropping this repo's matcher would leave core's card alone. |
 
 Unique ids are registered against this integration's own platform, so they never collide with core's even where the id string is the same.
-
-### Upgrading from 0.1.0
-
-0.1.0 used domain `sleepiq`, so it lived in `config/custom_components/sleepiq`. HACS installs 0.2.0 into `config/custom_components/sleepiq_massage` and leaves the 0.1.0 directory where it is: `remove_local_directory()` is called only from `uninstall()`, never on an update, and the install path is derived from the manifest domain of the version being downloaded. Home Assistant loads `custom_components/sleepiq` in preference to the built-in `sleepiq`, so the 0.1.0 copy keeps serving that config entry and HACS no longer tracks it to update it.
-
-Do this after the update:
-
-1. Delete `config/custom_components/sleepiq`.
-2. Restart Home Assistant. Core's built-in `sleepiq` takes over the 0.1.0 config entry and the massage entities disappear with the 0.1.0 code.
-3. Add SleepIQ (with massage) from Add integration.
-4. Delete the old entry if you want one set of entities.
 
 ## Supported devices
 
@@ -98,13 +87,23 @@ There are no actions (services), triggers or conditions; every function is an en
 
 ## Installation
 
-HACS: add this repository as a custom repository (category: Integration), install, restart Home Assistant.
+This is a HACS custom repository, not part of the HACS default list: it copies core's `sleepiq`, so it stays a custom repository until massage reaches `asyncsleepiq` and core (see Upstreaming). The first button adds it to HACS for you.
 
-Manual: copy `custom_components/sleepiq_massage/` into your config directory's `custom_components/`, then restart.
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=heidrickla&repository=ha-sleepiq&category=integration)
+
+1. Press the button above, confirm adding the repository, then Download in HACS, and restart Home Assistant when it asks.
+2. Press this button to start the setup, or take the SleepIQ (with massage) card under Discovered if Home Assistant has already seen your bed:
+
+[![Open your Home Assistant instance and start setting up SleepIQ (with massage).](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=sleepiq_massage)
+
+The setup has one screen, sometimes two:
+
+1. Sign in: the email address and password of your SleepIQ app account, then Submit. One entry covers every bed on the account.
+2. Only when Home Assistant's built-in SleepIQ is already signed in to the same account: a screen says both will create entities for each bed and where to delete the built-in entry to keep one set. Submit.
+
+Without the buttons: HACS, the three-dot menu, Custom repositories, add `https://github.com/heidrickla/ha-sleepiq` as an Integration, download SleepIQ (with massage) and restart; then Settings, Devices & services, Add integration, SleepIQ (with massage). Manual install: copy `custom_components/sleepiq_massage/` into your configuration's `custom_components/` folder and restart.
 
 Either way Home Assistant logs that it found a custom integration `sleepiq_massage` which it has not tested. That is expected of any custom integration.
-
-Then add it from Settings > Devices & services > Add integration > SleepIQ (with massage). Read Relationship to core's SleepIQ above first if core's `sleepiq` is already set up.
 
 Minimum Home Assistant version: 2026.8.0.
 
@@ -121,7 +120,7 @@ Minimum Home Assistant version: 2026.8.0.
 
 A SleepNumber bed on the same network is picked up by Home Assistant's DHCP watcher. Core's `sleepiq` claims the same MAC prefix `64DBA0*` and Home Assistant appends a custom integration's matchers to core's list instead of replacing them, so one bed raises two cards: SleepIQ and SleepIQ (with massage). Take the second. Core's card stays in the discovered list until it is set up or ignored, and setting it up gives a second set of entities for the same bed. Core raises its card only while core has no config entry of its own, so a user who already runs core's `sleepiq` sees one card, this one.
 
-The bed announces nothing about which SleepIQ account owns it, and this integration talks to the cloud rather than to the bed, so the card opens the same sign-in form. When this integration already has an entry its card is not raised again: one entry covers every bed on the account. A second bed, or the same bed on a new DHCP lease, does not raise a second card either. An entry of core's does not suppress this card, and this one does not suppress core's.
+The bed announces nothing about which SleepIQ account owns it, and this integration talks to the cloud rather than to the bed, so the card opens the same sign-in screen, followed by the same note when core is already signed in to the account. When this integration already has an entry its card is not raised again: one entry covers every bed on the account. A second bed, or the same bed on a new DHCP lease, does not raise a second card either. An entry of core's does not suppress this card, and this one does not suppress core's.
 
 ### Configuration options
 
@@ -380,7 +379,7 @@ The GitHub Tests workflow is the check that counts: ruff, both suites over one c
 
 ## Licence
 
-The project is MIT, in `LICENSE`. Most of `custom_components/sleepiq_massage/` is derived from Home Assistant core's `sleepiq` at tag 2026.8.2 and stays under Apache-2.0, whose text is in `docs/licenses/Apache-2.0.txt`. `massage.py`, `diagnostics.py`, `quality_scale.yaml` and `translations/` have no upstream counterpart and are MIT like the rest of the project; `NOTICE` carries the file-by-file split.
+The project is MIT, in `LICENSE`. Most of `custom_components/sleepiq_massage/` is derived from Home Assistant core's `sleepiq` at tag 2026.8.2 and stays under Apache-2.0, whose text is in `docs/licenses/Apache-2.0.txt`. `massage.py`, `diagnostics.py` and `quality_scale.yaml` have no upstream counterpart and are MIT like the rest of the project. `translations/en.json` is core's `strings.json` moved to the path a custom integration ships, and stays Apache-2.0. `NOTICE` carries the file-by-file split.
 
 ## Upstreaming
 
