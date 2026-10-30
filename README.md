@@ -87,13 +87,11 @@ Per side, added by this repository, for beds whose foundation reports the massag
 
 The option keys are the library's enum names, spelling included: an automation must send `revitilize`, not `revitalize`. The labels shown in the UI are the vendor app's own: Smooth, Revitalize, Wave.
 
-The massage entities are named by sleeper rather than by physical side, so the mode entity for the right-hand sleeper reads "Amy massage mode" and not "Right massage mode". That matches how core names the other per-sleeper comfort hardware, the foot warmer and core climate. A side with no sleeper on the account is named by position. Under the hood each entity is keyed on the bed and the physical side, so a bed with one sleeper still gets two independent sets of controls.
+The massage entities are named by sleeper rather than by physical side, so the mode entity for the right-hand sleeper reads "Alex massage mode" and not "Right massage mode". That matches how core names the other per-sleeper comfort hardware, the foot warmer and core climate. A side with no sleeper on the account is named by position. Under the hood each entity is keyed on the bed and the physical side, so a bed with one sleeper still gets two independent sets of controls.
 
 There are no actions (services), triggers or conditions; every function is an entity.
 
 ## Installation
-
-This is a HACS custom repository, not part of the HACS default list: it copies core's `sleepiq`, so it stays a custom repository until massage reaches `asyncsleepiq` and core (see Upstreaming). The first button adds it to HACS for you.
 
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=heidrickla&repository=ha-sleepiq&category=integration)
 
@@ -108,6 +106,8 @@ The setup has one screen, sometimes two:
 2. Only when Home Assistant's built-in SleepIQ is already signed in to the same account: a screen says both will create entities for each bed and where to delete the built-in entry to keep one set. Submit.
 
 Without the buttons: HACS, the three-dot menu, Custom repositories, add `https://github.com/heidrickla/ha-sleepiq` as an Integration, download SleepIQ (with massage) and restart; then Settings, Devices & services, Add integration, SleepIQ (with massage). Manual install: copy `custom_components/sleepiq_massage/` into your configuration's `custom_components/` folder and restart.
+
+This is a HACS custom repository, not part of the HACS default list: it copies core's `sleepiq`, so it stays a custom repository until massage reaches `asyncsleepiq` and core (see Upstreaming). The first button adds it to HACS for you.
 
 Either way Home Assistant logs that it found a custom integration `sleepiq_massage` which it has not tested. That is expected of any custom integration.
 
@@ -173,12 +173,12 @@ automation:
     actions:
       - action: number.set_value
         target:
-          entity_id: number.master_bedroom_amy_massage_timer
+          entity_id: number.bedroom_alex_massage_timer
         data:
           value: 20
       - action: select.select_option
         target:
-          entity_id: select.master_bedroom_amy_foot_massage_speed
+          entity_id: select.bedroom_alex_foot_massage_speed
         data:
           option: low
 ```
@@ -190,15 +190,15 @@ automation:
   - alias: Massage off when out of bed
     triggers:
       - trigger: state
-        entity_id: binary_sensor.master_bedroom_amy_is_in_bed
+        entity_id: binary_sensor.bedroom_alex_is_in_bed
         to: "off"
         for: "00:02:00"
     actions:
       - action: select.select_option
         target:
           entity_id:
-            - select.master_bedroom_amy_foot_massage_speed
-            - select.master_bedroom_amy_head_massage_speed
+            - select.bedroom_alex_foot_massage_speed
+            - select.bedroom_alex_head_massage_speed
         data:
           option: "off"
 ```
@@ -362,7 +362,7 @@ The object scan counts what it did not read beside what it did: a blob that is n
 
 No repository secret carries the names in. An undefined secret expands to the empty string, which reads as coverage and is not, and a defined one would put the name into the public run log the first time the name half matched.
 
-Three commit messages reachable from `main` quote addresses in the refused space, in the measurements those commits record. Commit messages are not rewritten here, so the object scan exempts those objects by SHA with the reason on each line, and prints a count of the objects it exempts so the hole is visible in the run. None of the three is in the published history, so each address is still unpublished and a message rewrite has to reach it before the first push.
+A commit message that quotes the pinned address table is exempt from the object scan by the sha256 of the message, the part after the commit headers, with the reason on each entry, so a history rewrite keeps the exemption. A version of `tools/_netblocks.py` is exempt by its file name in the tree. The scan prints how many blobs it exempts by file name and how many commits by their message.
 
 `python tools/make_brand.py` regenerates `custom_components/sleepiq_massage/brand/` and measures what it wrote.
 
