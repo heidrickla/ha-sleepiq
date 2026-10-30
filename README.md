@@ -4,6 +4,12 @@ Home Assistant's built-in `sleepiq` integration exposes firmness, head and foot 
 
 The domain is `sleepiq_massage`. It is a copy of the core integration with massage support layered on, under its own domain, so it installs beside core's `sleepiq` rather than replacing it. Everything core does, this does too; the massage entities are the addition.
 
+## Screenshots
+
+![The SleepIQ (with massage) setup screen asking for the account login](docs/images/setup.png)
+
+Setup asks for the SleepIQ account's username and password.
+
 ## Why core does not have it
 
 The gap is not in Home Assistant, and it is not that beds lack the hardware.
