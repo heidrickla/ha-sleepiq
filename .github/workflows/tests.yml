@@ -29,12 +29,15 @@ jobs:
           python-version: "3.14"
       # 0.13.357 pins Home Assistant 2026.8.3; it brings pytest, its asyncio
       # and aiohttp plugins, pytest-cov, PyYAML and Pillow with it (pinning
-      # those again here makes pip's resolution impossible). asyncsleepiq is
+      # those again here makes the resolution impossible). asyncsleepiq is
       # the integration's own requirement, which the harness does not install.
+      # uv installs the same packages as pip did (compared 2026-10-30) in a
+      # third of the time; 0.11.31 is the uv the harness itself pins.
       - run: |
           python -m venv .venv
-          .venv/bin/python -m pip install --upgrade pip
-          .venv/bin/python -m pip install "mypy==1.18.2" "ruff==0.15.21" \
+          .venv/bin/python -m pip install "uv==0.11.31"
+          .venv/bin/python -m uv pip install --python .venv/bin/python \
+            "mypy==1.18.2" "ruff==0.15.21" \
             "asyncsleepiq==1.7.1" \
             "pytest-homeassistant-custom-component==0.13.357"
       - run: .venv/bin/ruff check .
