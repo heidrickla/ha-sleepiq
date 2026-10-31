@@ -17,12 +17,8 @@ The check below is the exact size, not the store's range, so a file that drifts
 off what this script writes fails here as well as in
 tools/validate_local.py, which measures the same four sizes independently.
 
-The mark is what the integration does: a bed seen from the side, with the
-motion arcs of a massage running out of both ends. Palette and geometry match
-the sibling integrations - navy body, cyan panel, amber for the action.
-
-Everything is drawn at SUPERSAMPLE times the output size and reduced with
-LANCZOS, because PIL's arc and rounded_rectangle do not anti-alias.
+The icons use brand/icon-source.png. The wide logos retain the bed and
+massage motif.
 
     python tools/make_brand.py
 """
@@ -125,8 +121,18 @@ def main() -> None:
         "brand",
     )
     os.makedirs(out, exist_ok=True)
+    source = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "brand", "icon-source.png"
+    )
+    with Image.open(source) as original:
+        approved_icon = original.convert("RGBA")
     for name, size in SPECS.items():
-        render(size).save(os.path.join(out, name), "PNG", optimize=True)
+        image = (
+            approved_icon.resize(size, Image.LANCZOS)
+            if name.startswith("icon")
+            else render(size)
+        )
+        image.save(os.path.join(out, name), "PNG", optimize=True)
 
     # Reopen each file rather than trusting the calls above: the exact size, a
     # transparent background, and a mark that fills the box rather than
