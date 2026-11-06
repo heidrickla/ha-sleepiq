@@ -77,11 +77,7 @@ class SleepIQFlowHandler(ConfigFlow, domain=DOMAIN):
         core's entry does not hide this card; the sign-in step reads core's
         entries itself and says so before adding a second set of entities.
         """
-        _LOGGER.debug(
-            "SleepNumber bed discovered at %s (%s)",
-            discovery_info.ip,
-            discovery_info.macaddress,
-        )
+        _LOGGER.debug("SleepNumber bed discovered at %s", discovery_info.ip)
         await self._async_handle_discovery_without_unique_id()
         self.context["title_placeholders"] = {"name": "SleepNumber bed"}
         return await self.async_step_user()
