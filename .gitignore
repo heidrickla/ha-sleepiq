@@ -12,3 +12,4 @@ htmlcov/
 Thumbs.db
 .DS_Store
 CONTRIBUTING.md
+settings.local.json
