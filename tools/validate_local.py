@@ -569,10 +569,12 @@ UNPUBLISHED_PATHS = (
 IP_LITERAL_RE = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
 URL_RE = re.compile(r"\b[a-zA-Z][a-zA-Z0-9+.\-]*://[^\s\"'`<>)\]},]+")
 # A host written in prose with no scheme. The suffix must end the name:
-# \b would match the "home" of home-assistant.io.
+# \b would match the "home" of home-assistant.io. A file extension after the
+# suffix makes a file name (settings.local.json, CLAUDE.local.md) and no host.
 BARE_HOST_RE = re.compile(
     r"(?<![\w.-])(?:[a-z0-9][a-z0-9-]*\.)+"
-    r"(?:corp|home|home\.arpa|intranet|internal|lan|local|localdomain)(?![\w-])",
+    r"(?:corp|home|home\.arpa|intranet|internal|lan|local|localdomain)"
+    r"(?![\w-]|\.[a-z])",
     re.IGNORECASE,
 )
 # A host made of anything else is a template - f"http://{host}/" - not a host.
@@ -796,6 +798,11 @@ def scan_controls(
         f"the {RULE_SUFFIX} rule did not match {suffix_host}, a name it "
         "refuses, so a clean scan says nothing about the private suffixes in "
         "this repository",
+    )
+    check(
+        not fired(RULE_SUFFIX, "control line naming settings.local.json"),
+        f"the {RULE_SUFFIX} rule matched the file name settings.local.json, "
+        "which names no host",
     )
     if phrases:
         check(
